@@ -3,27 +3,38 @@
     "name": "Splitify",
     "slug": "Splitify",
     "version": "1.0.0",
+    "scheme": "splitify",
+    "backgroundColor": "#16171b",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#16171b"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.immanuel_e.Splitify"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0f0f0f",
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "autolinkingModuleResolution": true
     }
   }
 }
