@@ -1,4 +1,5 @@
 import {View, Text, StyleSheet, Image, Pressable, ScrollView} from 'react-native';
+import{useSafeAreaInsets} from 'react-native-safe-area-context';
 import BaseButton from '../../components/atoms/BaseButton';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -6,6 +7,7 @@ import {Send, Download, Upload, Clock, Bell, LogOut} from 'lucide-react-native';
 import ActivityCard from '../../components/molecule/ActivityCard'; 
 
 export default function HomeScreen (){
+    const insets = useSafeAreaInsets();
     const router = useRouter();
 
     const onPressSendMoney = () => router.push('/SendMoney');
@@ -13,12 +15,12 @@ export default function HomeScreen (){
     const onPressTopUp = () => router.push('/TopUp');
     const onPressWithdraw = () => router.push('/Withdraw');
     const onPressHistory = () => router.push('/History');
-    const onPressNotifications = () => router.push('/Notifications');
     const onPressActivity = () => router.push('/Activity');
+    const onPressNotifications = () => router.push('/screens/Notifications');
 
     return(
         // CHANGED: Outer wrapper is now a static View so the top section stays fixed
-        <View style={styles.Container}>
+        <View style={[styles.Container]}>
             
             {/* FIXED TOP SECTION */}
             <View style={styles.top}>

@@ -15,7 +15,7 @@ export default function CreateAccount() {
     };
 
     const onPressSignUp = () => {
-        router.push('/HomeScreen');
+        router.push('/screens/HomeScreen');
     };
 
     return (

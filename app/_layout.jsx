@@ -79,7 +79,13 @@ export default function RootLayout() {
             <Stack.Screen name="Auth/OTP" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
             <Stack.Screen name="Auth/NewPassword" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
             <Stack.Screen name="Auth/CreateAccount" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
-            <Stack.Screen name="HomeScreen" options={{ headerShown: false, headerBackVisible: false, headerTitle: "" }} />
+            <Stack.Screen name="screens/HomeScreen" options={{ headerShown: false, headerBackVisible: false, headerTitle: "" }} />
+            <Stack.Screen name="screens/Notifications" options={
+              {headerShown: false, headerBackVisible: true,
+                headerTitle: "Notifications" 
+              }
+            }
+            />
           </Stack>
       </ThemeProvider>
     </SafeAreaProvider>
