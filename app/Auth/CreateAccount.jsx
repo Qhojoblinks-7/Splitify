@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View, StyleSheet, Pressable } from 'react-native';
+import { Text, View, StyleSheet, Pressable , FlatList} from 'react-native';
 import Checkbox from 'expo-checkbox';
 import { Mail, Lock } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -15,7 +15,7 @@ export default function CreateAccount() {
     };
 
     const onPressSignUp = () => {
-        router.push('/screens/HomeScreen');
+        router.push('/(tabs)'); // Navigate to the home screen after successful sign-up
     };
 
     return (

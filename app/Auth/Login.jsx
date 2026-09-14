@@ -12,7 +12,7 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false); 
 
   const onPressLogin = () => {
-    router.replace("/screens/HomeScreen"); // Replace with your actual home screen route
+    router.replace("/(tabs)"); // Replace with your actual home screen route
   };
 
   const onPressForgotPassword = () => {

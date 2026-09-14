@@ -30,11 +30,11 @@ export default function () {
                 onPress={onPressSettings}/>
             </View>
             <ScrollView style={styles.notificationsList}>
-                <View stlye={styles.timeFrame}>
+                <View style={styles.timeFrame}>
                     <View style={styles.notificationItem}>
                     <View style={styles.notificationsTimeFrame}/>
                     <Text style={styles.notificationsTimeFrameText}>Today</Text>
-                    <View stlye={{height: StyleSheet.hairlineWidth, backgroundColor: '#2a2b30'}}/>
+                    <View style={{height: StyleSheet.hairlineWidth, backgroundColor: '#2a2b30'}}/>
                     <SquareExclamationPoint size={24} color="#fbb81c" />
                     <View style={styles.notificationItemTextContainer}>
                         <Text style={styles.notificationItemTitle}>New Feature Available!</Text>
