@@ -133,6 +133,7 @@ export default function HomeScreen (){
                         title="Dinner at Restaurant"
                         amount="45.00 GHC"
                         receipientName="John Doe"
+                        receipientEmail="john.doe@example.com"
                         initialStatus="pay"
                     />
                     <ActivityCard
@@ -145,6 +146,7 @@ export default function HomeScreen (){
                         title="Grocery Shopping"
                         amount="120.50 GHC"
                         receipientName="Alex Johnson"
+                        receipientEmail="alex.johnson@example.com"
                         initialStatus="paid"
                     />
                     <ActivityCard
@@ -158,12 +160,14 @@ export default function HomeScreen (){
                         title="Movie Night"
                         amount="35.00 GHC"
                         receipientName="Kofi Mensah"
+                        receipientEmail="kofi.mensah@example.com"
                         initialStatus="paid"
                     />
                     <ActivityCard
                         title="Internet Bundle"
                         amount="150.00 GHC"
                         receipientName="MTN Ghana"
+                        receipientEmail="support@mtnghana.com"
                         initialStatus="paid"
                     />
                     

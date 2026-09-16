@@ -8,9 +8,9 @@ export default function GroupDetailes() {
   const { id } = useLocalSearchParams();
 
   const bills = [
-    { id: "1", title: "Dinner", amount: "45.00 GHC", receipientName: "Jane Smith", senderName: "John Doe", initialStatus: "pay" },
-    { id: "2", title: "Groceries", amount: "120.00 GHC", receipientName: "Kofi", senderName: "John Doe", initialStatus: "request" },
-    { id: "3", title: "Transport", amount: "30.00 GHC", receipientName: "Ama", senderName: "Jane Smith", initialStatus: "paid" },
+    { id: "1", title: "Dinner", amount: "45.00 GHC", receipientName: "Jane Smith", receipientEmail: "jane.smith@example.com", senderName: "John Doe", initialStatus: "pay" },
+    { id: "2", title: "Groceries", amount: "120.00 GHC", receipientName: "Kofi", receipientEmail: "kofi@example.com", senderName: "John Doe", initialStatus: "request" },
+    { id: "3", title: "Transport", amount: "30.00 GHC", receipientName: "Ama", receipientEmail: "ama@example.com", senderName: "Jane Smith", initialStatus: "paid" },
   ];
 
   return (
@@ -29,6 +29,7 @@ export default function GroupDetailes() {
                     title={item.title}
                     amount={item.amount}
                     receipientName={item.receipientName}
+                    receipientEmail={item.receipientEmail}
                     senderName={item.senderName}
                     initialStatus={item.initialStatus}
                 />
