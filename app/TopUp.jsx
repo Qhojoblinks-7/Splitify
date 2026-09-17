@@ -47,13 +47,11 @@ export default function TopUp() {
   return (
     <TransactionForm
       title="Top Up"
-      subtitle="Add funds to your Splitify balance"
       headerIcon={<Upload size={28} color="#16171b" />}
       actionLabel="Top Up Balance"
       actionIcon={<Upload size={20} color="#16171b" />}
       methodOptions={methods}
       quickAmounts={[50, 100, 250, 500]}
-      balance="1,250.00"
       notePlaceholder="Add a reference for this top up"
       onAction={handleTopUp}
     />

@@ -96,7 +96,6 @@ export default function PrivacyPolicy() {
             <Shield size={30} color="#16171b" />
           </View>
           <Text style={styles.title}>Privacy Policy</Text>
-          <Text style={styles.subtitle}>The rules for how we handle your data</Text>
         </View>
 
         {/* Intro Card */}
@@ -171,13 +170,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 28,
     fontWeight: "bold",
-  },
-  subtitle: {
-    color: "#8e8e93",
-    fontSize: 15,
-    marginTop: 5,
-    textAlign: "center",
-    lineHeight: 21,
   },
   introCard: {
     backgroundColor: "#2a2b30",

@@ -17,9 +17,6 @@ export default function NewPassword (){
 
             <View style={styles.top}>
                 <Text style={styles.title}>Create new password</Text>
-                <Text style={styles.subtitle}>
-                    You're almost there! Please create a new password for your Splitify account.
-                </Text>
 
                 <CustomInput
                     label='New Password'
@@ -77,11 +74,5 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#ffffff',
         marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
-        marginBottom: 30,
-        lineHeight: 22,
     },
 });

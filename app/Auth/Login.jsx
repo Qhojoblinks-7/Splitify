@@ -36,7 +36,6 @@ export default function Login() {
         />
 
         <Text style={styles.title}>Welcome Back!</Text>
-        <Text style={styles.subtitle}>Please login to your account</Text>
 
         {/* 2. Pass the Mail icon into iconLeft */}
         <CustomInput 
@@ -120,11 +119,6 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: 'bold',
         color: '#ffffff',
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
-        marginBottom: 30,
     },
     input: {
         width: '100%',

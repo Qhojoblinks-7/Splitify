@@ -51,7 +51,6 @@ export default function SendMoney() {
   return (
     <TransactionForm
       title="Send Money"
-      subtitle="Send money securely to anyone in your network"
       headerIcon={<Send size={28} color="#16171b" />}
       actionLabel="Send Money"
       actionIcon={<Send size={20} color="#16171b" />}
@@ -59,7 +58,6 @@ export default function SendMoney() {
       showRecipient
       methodOptions={methods}
       quickAmounts={[20, 50, 100, 200]}
-      balance="1,250.00"
       notePlaceholder="What is this payment for?"
       onAction={handleSend}
     />

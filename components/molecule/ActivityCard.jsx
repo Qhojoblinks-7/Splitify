@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput } from 'react-native';
-import BottomSheet from './BottomSheet';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTabBarStore } from '../../store/tabBar';
 
-export default function ActivityCard({ 
+export default function ActivityCard({
     title,
-    amount,          
+    amount,
     receipientName,
     receipientEmail,
     senderName,
-    initialStatus    
+    initialStatus,
+    onPayPress,
 }) {
     const [status, setStatus] = useState(initialStatus?.toLowerCase() || 'pay');
-    const [isPaymentSheetVisible, setPaymentSheetVisible] = useState(false);
-    const [notes, setNotes] = useState('');
     const { setMode, setCustomButtons } = useTabBarStore();
 
     useEffect(() => {
@@ -23,47 +21,14 @@ export default function ActivityCard({
         };
     }, [setMode, setCustomButtons]);
 
-    const receiverEmail = receipientEmail || 'receiver@example.com';
-    const displayAmount = '00.00';
-
     const getReceiverInitials = () => {
         const nameParts = (receipientName || 'Receiver').trim().split(/\s+/);
         return `${nameParts[0]?.[0] || 'R'}${nameParts[1]?.[0] || ''}`.toUpperCase();
     };
 
-    const closePaymentSheet = () => {
-        setPaymentSheetVisible(false);
-        setNotes('');
-        setMode('tabs');
-        setCustomButtons([]);
-    };
-
-    const submitPayment = () => {
-        setStatus('paid');
-        closePaymentSheet();
-    };
-
-    const openPaymentSheet = () => {
-        setNotes('');
-        setMode('custom');
-        setCustomButtons([
-            {
-                label: 'Cancel',
-                variant: 'cancel',
-                onPress: closePaymentSheet,
-            },
-            {
-                label: 'Pay Now',
-                variant: 'primary',
-                onPress: submitPayment,
-            },
-        ]);
-        setPaymentSheetVisible(true);
-    };
-
     const handleAction = () => {
         if (status === 'pay') {
-            openPaymentSheet();
+            onPayPress?.({ title, amount, receipientName, receipientEmail, senderName, initialStatus });
         } else if (status === 'request') {
             console.log('Sending reminder request notification...');
             setStatus('paid');
@@ -138,47 +103,6 @@ export default function ActivityCard({
             </View>
 
         </View>
-
-        <BottomSheet
-            isVisible={isPaymentSheetVisible}
-            onClose={closePaymentSheet}
-            title="Pay"
-        >
-            <View style={styles.paymentSheetContent}>
-                <View style={styles.divider} />
-
-                <Text style={styles.paymentLabel}>Amount</Text>
-                <Text style={styles.paymentAmount}>{displayAmount}</Text>
-
-                <View style={styles.payToRow}>
-                    <Text style={styles.payToLabel}>Pay to</Text>
-                    <View style={styles.payToLine} />
-                </View>
-
-                <View style={styles.receiverRow}>
-                    <View style={styles.receiverAvatar}>
-                        <Text style={styles.receiverAvatarText}>{getReceiverInitials()}</Text>
-                    </View>
-                    <View style={styles.receiverInfo}>
-                        <Text style={styles.receiverName}>{receipientName || 'Receiver'}</Text>
-                        <Text style={styles.receiverEmail}>{receiverEmail}</Text>
-                    </View>
-                </View>
-
-                <View style={styles.divider} />
-
-                <Text style={styles.notesLabel}>Notes (optional)</Text>
-                <TextInput
-                    style={styles.notesInput}
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="Add a note"
-                    placeholderTextColor="#6f7076"
-                    multiline
-                    textAlignVertical="top"
-                />
-            </View>
-        </BottomSheet>
         </>
     );
 }
@@ -256,90 +180,5 @@ const styles = StyleSheet.create({
     },
     miniButtonTextPaid: {
         color: '#8e8e93',             // Muted text over disabled layout elements
-    },
-    paymentSheetContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 84,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#33353b',
-        marginVertical: 16,
-    },
-    paymentLabel: {
-        color: '#8e8e93',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    paymentAmount: {
-        color: '#ffffff',
-        fontSize: 30,
-        fontWeight: 'bold',
-        marginVertical: 4,
-    },
-    payToRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 18,
-    },
-    payToLabel: {
-        color: '#8e8e93',
-        fontSize: 14,
-        fontWeight: '600',
-        marginRight: 10,
-    },
-    payToLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#33353b',
-    },
-    receiverRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    receiverAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#fbb81c',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    receiverAvatarText: {
-        color: '#16171b',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    receiverInfo: {
-        marginLeft: 14,
-        flex: 1,
-    },
-    receiverName: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    receiverEmail: {
-        color: '#8e8e93',
-        fontSize: 13,
-        marginTop: 3,
-    },
-    notesLabel: {
-        color: '#8e8e93',
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 8,
-    },
-    notesInput: {
-        minHeight: 96,
-        borderWidth: 1,
-        borderColor: '#33353b',
-        borderRadius: 12,
-        backgroundColor: '#222327',
-        color: '#ffffff',
-        fontSize: 14,
-        padding: 12,
-        textAlignVertical: 'top',
     },
 });

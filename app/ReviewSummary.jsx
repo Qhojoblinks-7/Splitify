@@ -32,7 +32,6 @@ export default function ReviewSummary() {
         <View style={styles.header}>
           <Crown size={32} color="#fbb81c" />
           <Text style={styles.title}>Review Summary</Text>
-          <Text style={styles.subtitle}>Confirm your upgrade details</Text>
         </View>
 
         {/* Plan Summary */}
@@ -114,7 +113,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4, marginBottom: 20 },
   header: { alignItems: "center", marginBottom: 30 },
   title: { color: "#ffffff", fontSize: 28, fontWeight: "bold", marginTop: 12 },
-  subtitle: { color: "#8e8e93", fontSize: 16, marginTop: 4 },
   summaryCard: {
     backgroundColor: "#2a2b30",
     borderRadius: 16,

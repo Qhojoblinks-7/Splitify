@@ -18,9 +18,6 @@ export default function ForgotPassword() {
             {/* 1. Top Section - Inputs and Headings nested cleanly together */}
             <View style={styles.top}>
                 <Text style={styles.title}>Reset Your Password</Text>
-                <Text style={styles.subtitle}>
-                    Please enter your email and we will send you an OTP in the next step to reset your password.
-                </Text>
 
                 {/* Form wrapper */}
                 <View style={styles.inputWrapper}>
@@ -80,11 +77,5 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#ffffff',
         marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
-        marginBottom: 30,
-        lineHeight: 22,
     },
 });

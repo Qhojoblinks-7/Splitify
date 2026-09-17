@@ -1,7 +1,7 @@
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, Pressable} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { SquareExclamationPoint, Bell, Clock, Shield, Settings } from 'lucide-react-native';
+import { SquareExclamationPoint, Bell, Clock, Shield, ChevronLeft } from 'lucide-react-native';
 import { getDayLabel, makeDate, makeMonthAgo } from '../../utils/dayLabel';
 
 const allNotifications = [
@@ -15,10 +15,6 @@ const allNotifications = [
 export default function Notifications() {
   const inserts = useSafeAreaInsets();
   const router = useRouter();
-
-  const onPressSettings = () => {
-    router.push('/Settings');
-  };
 
   const sorted = [...allNotifications].sort((a, b) => b.date - a.date);
 
@@ -36,8 +32,17 @@ export default function Notifications() {
   return (
     <View style={[styles.container, { paddingTop: inserts.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Notifications</Text>
-        <Settings size={20} color="#fbb81c" style={styles.settingsIcon} onPress={onPressSettings} />
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.headerButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <ChevronLeft size={28} color="#ffffff" />
+        </Pressable>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -78,18 +83,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  headerText: {
-    color: '#fbb81c',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  settingsIcon: {
-    color: '#fbb81c',
+  headerButton: {
     padding: 4,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: 'bold',
   },
   notificationsList: {
     flex: 1,

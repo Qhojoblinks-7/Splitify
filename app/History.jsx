@@ -181,7 +181,6 @@ export default function History() {
         </Pressable>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>History</Text>
-          <Text style={styles.headerSubtitle}>Your money movements</Text>
         </View>
       </View>
 
@@ -197,34 +196,36 @@ export default function History() {
         />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {filters.map((filter) => (
-          <Pressable
-            key={filter.value}
-            onPress={() => setActiveFilter(filter.value)}
-            style={({ pressed }) => [
-              styles.filterPill,
-              activeFilter === filter.value && styles.filterPillActive,
-              pressed && styles.pressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`Show ${filter.label}`}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                activeFilter === filter.value && styles.filterTextActive,
+      <View style={{ height: 44 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {filters.map((filter) => (
+            <Pressable
+              key={filter.value}
+              onPress={() => setActiveFilter(filter.value)}
+              style={({ pressed }) => [
+                styles.filterPill,
+                activeFilter === filter.value && styles.filterPillActive,
+                pressed && styles.pressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${filter.label}`}
             >
-              {filter.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+              <Text
+                style={[
+                  styles.filterText,
+                  activeFilter === filter.value && styles.filterTextActive,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       <ScrollView
         style={styles.transactionList}
@@ -304,11 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
   },
-  headerSubtitle: {
-    color: "#8e8e93",
-    fontSize: 12,
-    marginTop: 2,
-  },
   searchBox: {
     minHeight: 50,
     marginHorizontal: 20,
@@ -330,16 +326,18 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     paddingHorizontal: 20,
-    gap: 8,
-    marginBottom: 18,
+    gap: 10,
+    marginBottom: 6,
   },
   filterPill: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 6,
+    minHeight: 36,
     borderRadius: 18,
     backgroundColor: "#2a2b30",
     borderWidth: 1,
     borderColor: "#33353b",
+    justifyContent: "center",
   },
   filterPillActive: {
     backgroundColor: "#fbb81c",

@@ -109,7 +109,6 @@ export default function HelpSupport() {
             <HelpCircle size={30} color="#16171b" />
           </View>
           <Text style={styles.title}>Help & Support</Text>
-          <Text style={styles.subtitle}>Find answers and get help with your account</Text>
         </View>
 
         <View style={styles.searchBox}>
@@ -291,12 +290,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 28,
     fontWeight: "bold",
-  },
-  subtitle: {
-    color: "#8e8e93",
-    fontSize: 15,
-    marginTop: 5,
-    textAlign: "center",
   },
   searchBox: {
     flexDirection: "row",

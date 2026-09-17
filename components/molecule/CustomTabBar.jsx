@@ -1,14 +1,23 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Platform, View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { QrCode, Share } from "lucide-react-native";
 import { useTabBarStore } from "../../store/tabBar";
 
+const STANDARD_CUSTOM_TAB_BAR_HEIGHT = Platform.select({
+  ios: 49,
+  android: 56,
+  default: 56,
+});
+
 export default function CustomTabBar() {
   const { mode } = useTabBarStore();
+  const insets = useSafeAreaInsets();
+  const customTabBarHeight = STANDARD_CUSTOM_TAB_BAR_HEIGHT + insets.bottom;
 
   if (mode === "qr") {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { height: customTabBarHeight, paddingBottom: insets.bottom }]}>
         <TouchableOpacity style={styles.qrTabBtn}>
           <QrCode size={24} color="#16171b" />
           <Text style={styles.qrTabText}>QR Code</Text>
@@ -30,7 +39,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
     backgroundColor: "#16171b",
     borderTopWidth: 1,
     borderTopColor: "#2a2b30",

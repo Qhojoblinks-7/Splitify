@@ -4,11 +4,25 @@ import BaseButton from '../../components/atoms/BaseButton';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {Send, Download, Upload, Clock, Bell, LogOut} from 'lucide-react-native';
-import ActivityCard from '../../components/molecule/ActivityCard'; 
+import ActivityCard from '../../components/molecule/ActivityCard';
+import BottomSheet from '../../components/molecule/BottomSheet';
+import { useTabBarStore } from '../../store/tabBar';
 
 export default function HomeScreen (){
     const insets = useSafeAreaInsets();
-    const router = useRouter();
+  const router = useRouter();
+  const [isSheetVisible, setSheetVisible] = useState(false);
+  const [isPaymentVisible, setPaymentVisible] = useState(false);
+  const [activities, setActivities] = useState([
+      { id: '1', title: 'Dinner at Restaurant', amount: '45.00 GHC', receipientName: 'John Doe', receipientEmail: 'john.doe@example.com', initialStatus: 'pay' },
+      { id: '2', title: 'Salary for June', amount: '1500.00 GHC', senderName: 'Jane Smith', initialStatus: 'request' },
+      { id: '3', title: 'Grocery Shopping', amount: '120.50 GHC', receipientName: 'Alex Johnson', receipientEmail: 'alex.johnson@example.com', initialStatus: 'paid' },
+      { id: '4', title: 'Freelance Project', amount: '600.00 GHC', senderName: 'Emily Davis', initialStatus: 'request' },
+      { id: '5', title: 'Movie Night', amount: '35.00 GHC', receipientName: 'Kofi Mensah', receipientEmail: 'kofi.mensah@example.com', initialStatus: 'paid' },
+      { id: '6', title: 'Internet Bundle', amount: '150.00 GHC', receipientName: 'MTN Ghana', receipientEmail: 'support@mtnghana.com', initialStatus: 'paid' },
+  ]);
+  const [paymentCard, setPaymentCard] = useState(null);
+  const { setMode, setCustomButtons } = useTabBarStore();
 
     const onPressSendMoney = () => router.push('/SendMoney');
     const onPressRequestMoney = () => router.push('/RequestMoney');
@@ -17,6 +31,29 @@ export default function HomeScreen (){
     const onPressHistory = () => router.push('/History');
     const onPressActivity = () => router.push('/Activity');
     const onPressNotifications = () => router.push('/screens/Notifications');
+
+    const handlePayPress = (card) => {
+        setPaymentCard(card);
+        setPaymentVisible(true);
+        setMode('custom');
+        setCustomButtons([
+            { label: 'Cancel', variant: 'cancel', onPress: () => { setPaymentVisible(false); setPaymentCard(null); setMode('tabs'); setCustomButtons([]); } },
+            { label: 'Pay Now', variant: 'primary', onPress: () => {
+                setActivities(prev => prev.map(a => a.id === card.id ? { ...a, initialStatus: 'paid' } : a));
+                setPaymentVisible(false);
+                setPaymentCard(null);
+                setMode('tabs');
+                setCustomButtons([]);
+            } },
+        ]);
+    };
+
+    const handlePaymentClose = () => {
+        setPaymentVisible(false);
+        setPaymentCard(null);
+        setMode('tabs');
+        setCustomButtons([]);
+    };
 
     return(
         // CHANGED: Outer wrapper is now a static View so the top section stays fixed
@@ -129,55 +166,68 @@ export default function HomeScreen (){
                     style={styles.activityList} 
                     showsVerticalScrollIndicator={false}
                 >
-                    <ActivityCard
-                        title="Dinner at Restaurant"
-                        amount="45.00 GHC"
-                        receipientName="John Doe"
-                        receipientEmail="john.doe@example.com"
-                        initialStatus="pay"
-                    />
-                    <ActivityCard
-                        title="Salary for June"
-                        amount="1500.00 GHC"
-                        senderName="Jane Smith"
-                        initialStatus="request"
-                    />
-                    <ActivityCard
-                        title="Grocery Shopping"
-                        amount="120.50 GHC"
-                        receipientName="Alex Johnson"
-                        receipientEmail="alex.johnson@example.com"
-                        initialStatus="paid"
-                    />
-                    <ActivityCard
-                        title="Freelance Project"
-                        amount="600.00 GHC"
-                        senderName="Emily Davis"
-                        initialStatus="request"
-                    />
-                    {/* Added duplicated items to explicitly demonstrate the scrolling boundary window */}
-                    <ActivityCard
-                        title="Movie Night"
-                        amount="35.00 GHC"
-                        receipientName="Kofi Mensah"
-                        receipientEmail="kofi.mensah@example.com"
-                        initialStatus="paid"
-                    />
-                    <ActivityCard
-                        title="Internet Bundle"
-                        amount="150.00 GHC"
-                        receipientName="MTN Ghana"
-                        receipientEmail="support@mtnghana.com"
-                        initialStatus="paid"
-                    />
+                    {activities.map(item => (
+                        <ActivityCard
+                            key={item.id}
+                            title={item.title}
+                            amount={item.amount}
+                            receipientName={item.receipientName}
+                            receipientEmail={item.receipientEmail}
+                            senderName={item.senderName}
+                            initialStatus={item.initialStatus}
+                            onPayPress={handlePayPress}
+                        />
+                    ))}
                     
                     {/* Safe clear padding at the bottom inside the scroll viewport */}
                     <View style={{ height: 20 }} />
                 </ScrollView>
             </View>
+
+            {paymentCard && (
+                <BottomSheet
+                    isVisible={isPaymentVisible}
+                    onClose={handlePaymentClose}
+                    title="Pay"
+                >
+                    <View style={styles.paymentSheetContent}>
+                        <View style={styles.divider} />
+
+                        <Text style={styles.paymentLabel}>Amount</Text>
+                        <Text style={styles.paymentAmount}>{paymentCard.amount}</Text>
+
+                        <View style={styles.payToRow}>
+                            <Text style={styles.payToLabel}>Pay to</Text>
+                            <View style={styles.payToLine} />
+                        </View>
+
+                        <View style={styles.receiverRow}>
+                            <View style={styles.receiverAvatar}>
+                                <Text style={styles.receiverAvatarText}>
+                                    {(paymentCard.receipientName || 'R').charAt(0)}
+                                </Text>
+                            </View>
+                            <View style={styles.receiverInfo}>
+                                <Text style={styles.receiverName}>{paymentCard.receipientName || 'Receiver'}</Text>
+                                <Text style={styles.receiverEmail}>{paymentCard.receipientEmail || 'receiver@example.com'}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.divider} />
+                    </View>
+                </BottomSheet>
+            )}
+
+            <BottomSheet
+              isVisible={isSheetVisible}
+              onClose={() => setSheetVisible(false)}
+              title="Quick Action"
+            >
+              <Text style={styles.sheetContentText}>Quick action content</Text>
+            </BottomSheet>
         </View>
     );
-}
+      }
 
 const styles = StyleSheet.create({
     Container: {
@@ -218,11 +268,6 @@ const styles = StyleSheet.create({
     },
     notificationIcon: {
         padding: 4,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
-        marginBottom: 30,
     },
     balanceContainer: {
         marginBottom: 24,
@@ -281,9 +326,11 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     activityContainer: {
-        flex: 1,                     // 🔥 CRITICAL: Tells this section to expand and take up all remaining screen space
+        flex: 1,
+        minHeight: 0,
         marginTop: 25,
         paddingHorizontal: 10,
+        overflow: 'hidden',
     },
     activityHeader: {
         flexDirection: 'row',
@@ -301,7 +348,83 @@ const styles = StyleSheet.create({
         color: '#c2a989',
     },
     activityList: {
-        flex: 1,                     // 🔥 CRITICAL: Dictates the scroll bounding box dimensions constraints
+        flex: 1,
+        minHeight: 0,
         width: '100%',
+        overflow: 'hidden',
+    },
+    paymentSheetContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 84,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#33353b',
+        marginVertical: 16,
+    },
+    paymentLabel: {
+        color: '#8e8e93',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    paymentAmount: {
+        color: '#ffffff',
+        fontSize: 30,
+        fontWeight: 'bold',
+        marginVertical: 4,
+    },
+    payToRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 18,
+    },
+    payToLabel: {
+        color: '#8e8e93',
+        fontSize: 14,
+        fontWeight: '600',
+        marginRight: 10,
+    },
+    payToLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#33353b',
+    },
+    receiverRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    receiverAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#fbb81c',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    receiverAvatarText: {
+        color: '#16171b',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    receiverInfo: {
+        marginLeft: 14,
+        flex: 1,
+    },
+    receiverName: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    receiverEmail: {
+        color: '#8e8e93',
+        fontSize: 13,
+        marginTop: 3,
+    },
+    sheetContentText: {
+        color: "#ffffff",
+        fontSize: 16,
+        textAlign: "center",
+        marginTop: 20,
     },
 });

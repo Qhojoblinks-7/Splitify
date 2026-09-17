@@ -42,7 +42,6 @@ export default function Security() {
         <View style={styles.header}>
           <Lock size={32} color="#fbb81c" />
           <Text style={styles.title}>Account & Security</Text>
-          <Text style={styles.subtitle}>Manage your security settings</Text>
         </View>
 
         {/* Authentication Methods */}
@@ -208,7 +207,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4, marginBottom: 20 },
   header: { alignItems: "center", marginBottom: 30 },
   title: { color: "#ffffff", fontSize: 28, fontWeight: "bold", marginTop: 12 },
-  subtitle: { color: "#8e8e93", fontSize: 16, marginTop: 4 },
   section: { marginBottom: 24 },
   sectionTitle: { color: "#ffffff", fontSize: 18, fontWeight: "bold", marginBottom: 16 },
   toggleItem: {

@@ -26,7 +26,6 @@ export default function RequestMoney() {
   return (
     <TransactionForm
       title="Request Money"
-      subtitle="Ask a friend or group to pay you back"
       headerIcon={<Download size={28} color="#16171b" />}
       actionLabel="Send Request"
       actionIcon={<Download size={20} color="#16171b" />}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,13 +8,13 @@ import {
   View,
 } from "react-native";
 import { Text, StyleSheet } from "react-native";
-import { ChevronLeft } from "lucide-react-native";
+import { ChevronLeft, ChevronDown, Users } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import BottomSheet from "./BottomSheet";
 
 export default function TransactionForm({
   title,
-  subtitle,
   headerIcon,
   actionLabel,
   actionIcon,
@@ -25,15 +25,21 @@ export default function TransactionForm({
   quickAmounts = [],
   notePlaceholder = "Add a note",
   summaryPrefix = "Sending to",
-  balance,
   onAction,
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [selectedRecipient, setSelectedRecipient] = useState(recipients[0]?.id);
-  const [selectedMethod, setSelectedMethod] = useState(methodOptions[0]?.id);
+  const [selectedRecipient, setSelectedRecipient] = useState(
+    recipients[0]?.id
+  );
+  const [selectedMethod, setSelectedMethod] = useState(
+    methodOptions[0]?.id
+  );
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [showMethodSheet, setShowMethodSheet] = useState(false);
+  const [showRecipientSheet, setShowRecipientSheet] = useState(false);
   const [error, setError] = useState("");
 
   const selectedRecipientData = recipients.find(
@@ -46,6 +52,16 @@ export default function TransactionForm({
   const formattedAmount = Number.isFinite(numericAmount)
     ? numericAmount.toFixed(2)
     : "0.00";
+
+  const filteredRecipients = useMemo(() => {
+    if (!recipientSearch.trim()) return recipients;
+    const query = recipientSearch.toLowerCase();
+    return recipients.filter(
+      (r) =>
+        r.name.toLowerCase().includes(query) ||
+        r.handle.toLowerCase().includes(query)
+    );
+  }, [recipients, recipientSearch]);
 
   const handleAction = () => {
     if (!amount.trim() || numericAmount <= 0) {
@@ -74,15 +90,11 @@ export default function TransactionForm({
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={insets.top}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
         <Pressable
           onPress={() => router.back()}
           style={styles.backButton}
@@ -93,49 +105,69 @@ export default function TransactionForm({
         </Pressable>
 
         <View style={styles.header}>
-          <View style={styles.headerIcon}>{headerIcon}</View>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
+      </View>
 
-        {balance !== undefined && (
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Available balance</Text>
-            <View style={styles.balanceRow}>
-              <Text style={styles.balanceCurrency}>GHC</Text>
-              <Text style={styles.balanceValue}>{balance}</Text>
-            </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {showMethod && methodOptions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment method</Text>
+            <Pressable
+              onPress={() => setShowMethodSheet(true)}
+              style={({ pressed }) => [
+                styles.methodDropdown,
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Select payment method"
+            >
+              <View style={styles.methodDropdownInner}>
+                <View style={styles.methodIcon}>{selectedMethodData?.icon}</View>
+                <View style={styles.methodDropdownDetails}>
+                  <Text style={styles.methodDropdownName}>
+                    {selectedMethodData?.label || "Select method"}
+                  </Text>
+                  <Text style={styles.methodDropdownDesc}>
+                    {selectedMethodData?.description || ""}
+                  </Text>
+                </View>
+              </View>
+              <ChevronDown size={20} color="#8e8e93" />
+            </Pressable>
           </View>
         )}
 
         {showRecipient && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Recipient</Text>
-            <View style={styles.recipientList}>
-              {recipients.map((recipient) => (
-                <Pressable
-                  key={recipient.id}
-                  onPress={() => {
-                    setSelectedRecipient(recipient.id);
-                    setError("");
-                  }}
-                  style={({ pressed }) => [
-                    styles.recipientItem,
-                    selectedRecipient === recipient.id && styles.recipientItemSelected,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select ${recipient.name}`}
-                >
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{recipient.initials}</Text>
-                  </View>
-                  <View style={styles.recipientDetails}>
-                    <Text style={styles.recipientName}>{recipient.name}</Text>
-                    <Text style={styles.recipientHandle}>{recipient.handle}</Text>
-                  </View>
-                </Pressable>
-              ))}
+            <View style={styles.recipientField}>
+              <TextInput
+                value={
+                  recipientSearch ||
+                  (selectedRecipientData ? selectedRecipientData.name : "")
+                }
+                onChangeText={(text) => {
+                  setRecipientSearch(text);
+                }}
+                placeholder="Search or select recipient"
+                placeholderTextColor="#666666"
+                style={styles.recipientInput}
+                accessibilityLabel="Recipient"
+              />
+              <Pressable
+                onPress={() => setShowRecipientSheet(true)}
+                style={styles.phonebookIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Show contacts"
+              >
+                <Users size={20} color="#8e8e93" />
+              </Pressable>
             </View>
           </View>
         )}
@@ -176,7 +208,8 @@ export default function TransactionForm({
                   <Text
                     style={[
                       styles.quickAmountText,
-                      numericAmount === quickAmount && styles.quickAmountTextSelected,
+                      numericAmount === quickAmount &&
+                        styles.quickAmountTextSelected,
                     ]}
                   >
                     +{quickAmount}
@@ -186,43 +219,6 @@ export default function TransactionForm({
             </View>
           )}
         </View>
-
-        {showMethod && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Payment method</Text>
-            <View style={styles.methodList}>
-              {methodOptions.map((method) => (
-                <Pressable
-                  key={method.id}
-                  onPress={() => {
-                    setSelectedMethod(method.id);
-                    setError("");
-                  }}
-                  style={({ pressed }) => [
-                    styles.methodItem,
-                    selectedMethod === method.id && styles.methodItemSelected,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`Select ${method.label}`}
-                  accessibilityState={{ selected: selectedMethod === method.id }}
-                >
-                  <View style={styles.methodIcon}>{method.icon}</View>
-                  <View style={styles.methodDetails}>
-                    <Text style={styles.methodName}>{method.label}</Text>
-                    <Text style={styles.methodDescription}>{method.description}</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.methodCheck,
-                      selectedMethod === method.id && styles.methodCheckSelected,
-                    ]}
-                  />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Note</Text>
@@ -262,6 +258,98 @@ export default function TransactionForm({
           {formattedAmount}
         </Text>
       </ScrollView>
+
+      {showMethod && (
+        <BottomSheet
+          isVisible={showMethodSheet}
+          onClose={() => setShowMethodSheet(false)}
+          title="Select payment method"
+        >
+          <View style={styles.sheetList}>
+            {methodOptions.map((method) => (
+              <Pressable
+                key={method.id}
+                onPress={() => {
+                  setSelectedMethod(method.id);
+                  setShowMethodSheet(false);
+                  setError("");
+                }}
+                style={({ pressed }) => [
+                  styles.methodItem,
+                  selectedMethod === method.id && styles.methodItemSelected,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="radio"
+                accessibilityLabel={`Select ${method.label}`}
+                accessibilityState={{ selected: selectedMethod === method.id }}
+              >
+                <View style={styles.methodIcon}>{method.icon}</View>
+                <View style={styles.methodDetails}>
+                  <Text style={styles.methodName}>{method.label}</Text>
+                  <Text style={styles.methodDescription}>
+                    {method.description}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.methodCheck,
+                    selectedMethod === method.id && styles.methodCheckSelected,
+                  ]}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </BottomSheet>
+      )}
+
+      {showRecipient && (
+        <BottomSheet
+          isVisible={showRecipientSheet}
+          onClose={() => {
+            setShowRecipientSheet(false);
+            setRecipientSearch("");
+          }}
+          title="Select recipient"
+        >
+          <TextInput
+            value={recipientSearch}
+            onChangeText={setRecipientSearch}
+            placeholder="Search by name or handle..."
+            placeholderTextColor="#666666"
+            style={styles.searchInput}
+            accessibilityLabel="Search recipients"
+          />
+          <View style={styles.sheetList}>
+            {filteredRecipients.map((recipient) => (
+              <Pressable
+                key={recipient.id}
+                onPress={() => {
+                  setSelectedRecipient(recipient.id);
+                  setRecipientSearch("");
+                  setShowRecipientSheet(false);
+                  setError("");
+                }}
+                style={({ pressed }) => [
+                  styles.recipientItem,
+                  selectedRecipient === recipient.id &&
+                    styles.recipientItemSelected,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${recipient.name}`}
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{recipient.initials}</Text>
+                </View>
+                <View style={styles.recipientDetails}>
+                  <Text style={styles.recipientName}>{recipient.name}</Text>
+                  <Text style={styles.recipientHandle}>{recipient.handle}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </BottomSheet>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -271,8 +359,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#16171b",
   },
+  headerContainer: {
+    backgroundColor: "#16171b",
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
   backButton: {
@@ -283,53 +379,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
-  headerIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#fbb81c",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 14,
-  },
   title: {
     color: "#ffffff",
     fontSize: 28,
-    fontWeight: "bold",
-  },
-  subtitle: {
-    color: "#8e8e93",
-    fontSize: 15,
-    marginTop: 5,
-    textAlign: "center",
-    lineHeight: 21,
-  },
-  balanceCard: {
-    backgroundColor: "#2a2b30",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "#33353b",
-  },
-  balanceLabel: {
-    color: "#8e8e93",
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  balanceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-  },
-  balanceCurrency: {
-    color: "#fbb81c",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginRight: 6,
-  },
-  balanceValue: {
-    color: "#ffffff",
-    fontSize: 32,
     fontWeight: "bold",
   },
   section: {
@@ -341,51 +393,70 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 12,
   },
-  recipientList: {
-    gap: 10,
-  },
-  recipientItem: {
+  methodDropdown: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "#2a2b30",
     borderRadius: 14,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
     borderColor: "#33353b",
   },
-  recipientItemSelected: {
-    borderColor: "#fbb81c",
-    backgroundColor: "#302f27",
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#fbb81c",
-    justifyContent: "center",
+  methodDropdownInner: {
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: 12,
-  },
-  avatarText: {
-    color: "#16171b",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  recipientDetails: {
     flex: 1,
   },
-  recipientName: {
+  methodDropdownDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  methodDropdownName: {
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "600",
   },
-  recipientHandle: {
+  methodDropdownDesc: {
     color: "#8e8e93",
     fontSize: 13,
     marginTop: 2,
   },
+  recipientField: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 52,
+    backgroundColor: "#2a2b30",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#33353b",
+  },
+  recipientInput: {
+    flex: 1,
+    color: "#ffffff",
+    fontSize: 15,
+    paddingVertical: 14,
+  },
+  phonebookIcon: {
+    padding: 4,
+  },
+  searchInput: {
+    color: "#ffffff",
+    fontSize: 15,
+    backgroundColor: "#2a2b30",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#33353b",
+  },
+  sheetList: {
+    gap: 10,
+  },
   amountInput: {
-    minHeight: 66,
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#2a2b30",
@@ -403,7 +474,7 @@ const styles = StyleSheet.create({
   amountInputText: {
     flex: 1,
     color: "#ffffff",
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "bold",
     paddingVertical: 14,
   },
@@ -432,9 +503,6 @@ const styles = StyleSheet.create({
   },
   quickAmountTextSelected: {
     color: "#16171b",
-  },
-  methodList: {
-    gap: 10,
   },
   methodItem: {
     flexDirection: "row",
@@ -483,7 +551,7 @@ const styles = StyleSheet.create({
     borderColor: "#fbb81c",
   },
   noteInput: {
-    minHeight: 92,
+    minHeight: 52,
     color: "#ffffff",
     fontSize: 15,
     lineHeight: 22,
@@ -520,6 +588,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
     marginTop: 14,
+  },
+  recipientItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2a2b30",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#33353b",
+  },
+  recipientItemSelected: {
+    borderColor: "#fbb81c",
+    backgroundColor: "#302f27",
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#fbb81c",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  avatarText: {
+    color: "#16171b",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  recipientDetails: {
+    flex: 1,
+  },
+  recipientName: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  recipientHandle: {
+    color: "#8e8e93",
+    fontSize: 13,
+    marginTop: 2,
   },
   pressed: {
     opacity: 0.78,

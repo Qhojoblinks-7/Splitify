@@ -57,7 +57,6 @@ export default function AppSettings() {
             <Settings size={30} color="#16171b" />
           </View>
           <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Customize your Splitify experience</Text>
         </View>
 
         {/* Preferences Section */}
@@ -258,7 +257,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: { color: "#ffffff", fontSize: 28, fontWeight: "bold" },
-  subtitle: { color: "#8e8e93", fontSize: 15, marginTop: 5, textAlign: "center", lineHeight: 21 },
   section: { marginBottom: 28 },
   sectionTitle: { color: "#ffffff", fontSize: 18, fontWeight: "bold", marginBottom: 16 },
   toggleItem: {

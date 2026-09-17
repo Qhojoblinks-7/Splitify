@@ -53,7 +53,6 @@ export default function AboutUs() {
             <Info size={30} color="#16171b" />
           </View>
           <Text style={styles.title}>About Splitify</Text>
-          <Text style={styles.subtitle}>Making shared expenses clear, simple, and stress-free</Text>
         </View>
 
         <View style={styles.missionCard}>
@@ -140,13 +139,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 28,
     fontWeight: "bold",
-  },
-  subtitle: {
-    color: "#8e8e93",
-    fontSize: 15,
-    marginTop: 5,
-    textAlign: "center",
-    lineHeight: 21,
   },
   missionCard: {
     backgroundColor: "#2a2b30",

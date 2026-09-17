@@ -41,13 +41,11 @@ export default function Withdraw() {
   return (
     <TransactionForm
       title="Withdraw"
-      subtitle="Move money from your balance to your account"
       headerIcon={<LogOut size={28} color="#16171b" />}
       actionLabel="Withdraw Funds"
       actionIcon={<LogOut size={20} color="#16171b" />}
       methodOptions={methods}
       quickAmounts={[50, 100, 250, 500]}
-      balance="1,250.00"
       notePlaceholder="Add a withdrawal reference"
       onAction={handleWithdraw}
     />

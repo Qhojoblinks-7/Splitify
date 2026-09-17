@@ -25,7 +25,7 @@ export default function BottomSheet({
   useEffect(() => {
     if (isVisible) {
       Animated.spring(translateY, {
-        toValue: SCREEN_HEIGHT - SNAP_HEIGHT,
+        toValue: 0,
         useNativeDriver: true,
         friction: 8,
         tension: 100,
@@ -47,8 +47,8 @@ export default function BottomSheet({
         Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
       onPanResponderMove: (_, gesture) => {
         const nextPosition = Math.max(
-          SCREEN_HEIGHT - SNAP_HEIGHT,
-          Math.min(SCREEN_HEIGHT, SCREEN_HEIGHT - SNAP_HEIGHT + gesture.dy)
+          0,
+          Math.min(SCREEN_HEIGHT, gesture.dy)
         );
         translateY.setValue(nextPosition);
       },
@@ -57,7 +57,7 @@ export default function BottomSheet({
           onClose();
         } else {
           Animated.spring(translateY, {
-            toValue: SCREEN_HEIGHT - SNAP_HEIGHT,
+            toValue: 0,
             useNativeDriver: true,
             friction: 8,
             tension: 100,
@@ -66,11 +66,6 @@ export default function BottomSheet({
       },
     })
   ).current;
-
-  const overlayOpacity = translateY.interpolate({
-    inputRange: [SCREEN_HEIGHT - SNAP_HEIGHT, SCREEN_HEIGHT],
-    outputRange: [0.5, 0],
-  });
 
   if (!isVisible) {
     return null;
@@ -83,7 +78,7 @@ export default function BottomSheet({
         activeOpacity={1}
         onPress={onClose}
       >
-        <Animated.View style={[styles.backdropInner, { opacity: overlayOpacity }]} />
+        <Animated.View style={[styles.backdropInner, { opacity: translateY.interpolate({ inputRange: [0, SCREEN_HEIGHT], outputRange: [0.5, 0] }) }]} />
       </TouchableOpacity>
 
       <Animated.View
@@ -129,13 +124,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    width: SCREEN_WIDTH,
     height: SNAP_HEIGHT,
     backgroundColor: "#16171b",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 10,
-    paddingBottom: 40,
+    paddingBottom: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,

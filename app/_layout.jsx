@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from "react-native";
+import { Platform, View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from "react-native";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar"; 
 // 1. IMPORT THEME ROUTING MANIFEST PACKAGES
 import { ThemeProvider, DarkTheme } from "expo-router";
 import { useTabBarStore } from "../store/tabBar";
+
+const STANDARD_ACTION_BAR_HEIGHT = Platform.select({
+  ios: 49,
+  android: 56,
+  default: 56,
+});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -54,81 +60,90 @@ export default function RootLayout() {
     <SafeAreaProvider>
       {/* 3. WRAP THE CODES DIRECTLY INSIDE THE THEME PROVIDER BLOCK */}
       <ThemeProvider value={SplitifyTheme}>
-        <View style={styles.rootContainer}>
-          <StatusBar style="light" translucent={true} backgroundColor="transparent" />
-        
-          <Stack
-            screenOptions={{
-              headerShown: false, 
-              headerShadowVisible: false,
-              // Specifying animation configurations explicitly handles smoother rendering steps
-              animation: "slide_from_right", 
-              contentStyle: {
-                backgroundColor: "#16171b", // Extra layout paint fallback protection layer
-              },
-              headerStyle: {
-                backgroundColor: "#16171b", 
-              },
-              headerTintColor: "#ffffff",
-              headerTitleStyle: {
-                fontWeight: "bold",
-              },
-            }}
-          >
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="Auth/Auth" /> 
-            <Stack.Screen name="Auth/Login" /> 
-            <Stack.Screen name="Auth/ForgotPassword" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
-            <Stack.Screen name="Auth/OTP" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
-            <Stack.Screen name="Auth/NewPassword" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
-            <Stack.Screen name="Auth/CreateAccount" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="screens/Notifications" options={
-              {headerShown: false, headerBackVisible: true,
-                headerTitle: "Notifications" 
-              }
-            }
-            />
-            <Stack.Screen name="HelpSupport" options={{ headerShown: false }} />
-            <Stack.Screen name="ContactSupport" options={{ headerShown: false }} />
-            <Stack.Screen name="PrivacyPolicy" options={{ headerShown: false }} />
-            <Stack.Screen name="AboutUs" options={{ headerShown: false }} />
-            <Stack.Screen name="TermsOfService" options={{ headerShown: false }} />
-            <Stack.Screen name="SendMoney" options={{ headerShown: false }} />
-            <Stack.Screen name="RequestMoney" options={{ headerShown: false }} />
-            <Stack.Screen name="TopUp" options={{ headerShown: false }} />
-            <Stack.Screen name="Withdraw" options={{ headerShown: false }} />
-            <Stack.Screen name="History" options={{ headerShown: false }} />
-          </Stack>
-
-          {mode === "custom" && customButtons.length > 0 && (
-            <View style={styles.customActionBar}>
-              {customButtons.map((btn, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[
-                    styles.customActionButton,
-                    btn.variant === "cancel" && styles.customActionCancel,
-                    btn.variant === "primary" && styles.customActionPrimary,
-                  ]}
-                  onPress={btn.onPress}
-                >
-                  <Text
-                    style={[
-                      styles.customActionText,
-                      btn.variant === "cancel" && styles.customActionCancelText,
-                      btn.variant === "primary" && styles.customActionPrimaryText,
-                    ]}
-                  >
-                    {btn.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        <RootContent mode={mode} customButtons={customButtons} />
       </ThemeProvider>
     </SafeAreaProvider>
+  );
+}
+
+function RootContent({ mode, customButtons }) {
+  const insets = useSafeAreaInsets();
+  const actionBarHeight = STANDARD_ACTION_BAR_HEIGHT + insets.bottom;
+
+  return (
+    <View style={styles.rootContainer}>
+      <StatusBar style="light" translucent={true} backgroundColor="transparent" />
+
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          headerShadowVisible: false,
+          // Specifying animation configurations explicitly handles smoother rendering steps
+          animation: "slide_from_right",
+          contentStyle: {
+            backgroundColor: "#16171b", // Extra layout paint fallback protection layer
+          },
+          headerStyle: {
+            backgroundColor: "#16171b",
+          },
+          headerTintColor: "#ffffff",
+          headerTitleStyle: {
+            fontWeight: "bold",
+          },
+        }}
+      >
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="Auth/Auth" />
+        <Stack.Screen name="Auth/Login" />
+        <Stack.Screen name="Auth/ForgotPassword" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
+        <Stack.Screen name="Auth/OTP" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
+        <Stack.Screen name="Auth/NewPassword" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
+        <Stack.Screen name="Auth/CreateAccount" options={{ headerShown: true, headerBackVisible: true, headerTitle: "" }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="screens/Notifications" options={
+          {headerShown: false, headerBackVisible: true,
+            headerTitle: "Notifications"
+          }
+        }
+        />
+        <Stack.Screen name="HelpSupport" options={{ headerShown: false }} />
+        <Stack.Screen name="ContactSupport" options={{ headerShown: false }} />
+        <Stack.Screen name="PrivacyPolicy" options={{ headerShown: false }} />
+        <Stack.Screen name="AboutUs" options={{ headerShown: false }} />
+        <Stack.Screen name="TermsOfService" options={{ headerShown: false }} />
+        <Stack.Screen name="SendMoney" options={{ headerShown: false }} />
+        <Stack.Screen name="RequestMoney" options={{ headerShown: false }} />
+        <Stack.Screen name="TopUp" options={{ headerShown: false }} />
+        <Stack.Screen name="Withdraw" options={{ headerShown: false }} />
+        <Stack.Screen name="History" options={{ headerShown: false }} />
+      </Stack>
+
+      {mode === "custom" && customButtons.length > 0 && (
+        <View style={[styles.customActionBar, { height: actionBarHeight, paddingBottom: insets.bottom }]}>
+          {customButtons.map((btn, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={[
+                styles.customActionButton,
+                btn.variant === "cancel" && styles.customActionCancel,
+                btn.variant === "primary" && styles.customActionPrimary,
+              ]}
+              onPress={btn.onPress}
+            >
+              <Text
+                style={[
+                  styles.customActionText,
+                  btn.variant === "cancel" && styles.customActionCancelText,
+                  btn.variant === "primary" && styles.customActionPrimaryText,
+                ]}
+              >
+                {btn.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -159,7 +174,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
     backgroundColor: "#16171b",
     borderTopWidth: 1,
     borderTopColor: "#2a2b30",

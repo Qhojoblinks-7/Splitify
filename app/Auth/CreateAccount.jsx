@@ -24,9 +24,6 @@ export default function CreateAccount() {
             {/* 1. Main Header and Form Area */}
             <View style={styles.top}>
                 <Text style={styles.title}>Create Account</Text>
-                <Text style={styles.subtitle}>
-                    Please enter your email and password to sign up
-                </Text>
 
                 <View style={styles.inputWrapper}>
                     <CustomInput
@@ -127,12 +124,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#ffffff',
         marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
-        marginBottom: 30,
-        lineHeight: 22,
     },
     checkboxContainer: {
         flexDirection: 'row',

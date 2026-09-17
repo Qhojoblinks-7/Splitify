@@ -18,9 +18,6 @@ export default function OTP() {
             {/* Top Main Section */}
             <View style={styles.top}>
                 <Text style={styles.title}>OTP Code Verification</Text>
-                <Text style={styles.subtitle}>
-                    We have sent an OTP code to your email and*******lay@gmail.com. Enter the OTP code to verify.
-                </Text>
 
                 {/* The 4-digit layout block */}
                 <View style={styles.inputContainer}>
@@ -96,12 +93,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#ffffff',
         marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
-        marginBottom: 30,
-        lineHeight: 22,
     },
     inputContainer: {
         flexDirection: 'row',

@@ -61,7 +61,6 @@ export default function Congrats() {
           <Crown size={48} color="#fbb81c" style={styles.crown} />
 
           <Text style={styles.title}>You&apos;re Now Premium!</Text>
-          <Text style={styles.subtitle}>Welcome to Splitify Pro</Text>
         </Animated.View>
 
         {/* Benefits Unlocked */}
@@ -108,7 +107,6 @@ const styles = StyleSheet.create({
   checkContainer: { marginBottom: 16 },
   crown: { marginBottom: 16 },
   title: { color: "#ffffff", fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 8 },
-  subtitle: { color: "#8e8e93", fontSize: 16, textAlign: "center", marginBottom: 40 },
   benefitsContainer: { width: "100%", marginBottom: 30 },
   benefitsTitle: { color: "#ffffff", fontSize: 18, fontWeight: "bold", textAlign: "center", marginBottom: 16 },
   benefitsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12 },

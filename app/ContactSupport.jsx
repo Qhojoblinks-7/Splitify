@@ -113,7 +113,6 @@ export default function ContactSupport() {
             <HelpCircle size={30} color="#16171b" />
           </View>
           <Text style={styles.title}>Contact Support</Text>
-          <Text style={styles.subtitle}>Reach us through any of these channels</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Contact Methods</Text>
@@ -183,12 +182,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 28,
     fontWeight: "bold",
-  },
-  subtitle: {
-    color: "#8e8e93",
-    fontSize: 15,
-    marginTop: 5,
-    textAlign: "center",
   },
   sectionTitle: {
     color: "#ffffff",

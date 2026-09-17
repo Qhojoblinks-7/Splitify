@@ -35,7 +35,6 @@ export default function UpgradePlan() {
         <View style={styles.header}>
           <Crown size={32} color="#fbb81c" />
           <Text style={styles.title}>Upgrade Plan</Text>
-          <Text style={styles.subtitle}>Unlock premium features</Text>
         </View>
 
         {/* Plan Cards */}
@@ -88,7 +87,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4, marginBottom: 20 },
   header: { alignItems: "center", marginBottom: 30 },
   title: { color: "#ffffff", fontSize: 28, fontWeight: "bold", marginTop: 12 },
-  subtitle: { color: "#8e8e93", fontSize: 16, marginTop: 4 },
   plansContainer: { gap: 12, marginBottom: 30 },
   planCard: {
     flex: 1,

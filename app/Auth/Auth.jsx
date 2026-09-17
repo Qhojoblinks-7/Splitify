@@ -37,7 +37,6 @@ export default function Auth() {
       />
 
       <Text style={styles.title}>Let's Get Started</Text>
-      <Text style={styles.subtitle}>With Splitify, splitting bills and expenses is easier than ever before</Text>
 
       {/* Social Button Grouping container */}
       <View style={styles.buttonGroup}>
@@ -116,14 +115,6 @@ const styles = StyleSheet.create({
     color: '#ffffff', // High-contrast white text header
     marginBottom: 12,
     textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#9aa0a6', // Soft secondary gray text for descriptions
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
-    paddingHorizontal: 16,
   },
   buttonGroup: {
     width: '100%',
