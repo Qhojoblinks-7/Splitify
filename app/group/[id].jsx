@@ -1,18 +1,13 @@
 import {useLocalSearchParams} from "expo-router";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActivityCard from "../../components/molecule/ActivityCard";
 import BottomSheet from "../../components/molecule/BottomSheet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTabBarStore } from "../../store/tabBar";
-import { ChevronLeft, MoreVertical, Receipt, Plus } from "lucide-react-native";
+import { ChevronLeft, MoreVertical, Receipt, Plus, UserPlus } from "lucide-react-native";
 import { useRouter } from "expo-router";
-
-const initialBills = [
-    { id: "1", title: "Dinner", amount: "45.00 GHC", receipientName: "Jane Smith", receipientEmail: "jane.smith@example.com", senderName: "John Doe", initialStatus: "pay" },
-    { id: "2", title: "Groceries", amount: "120.00 GHC", receipientName: "Kofi", receipientEmail: "kofi@example.com", senderName: "John Doe", initialStatus: "request" },
-    { id: "3", title: "Transport", amount: "30.00 GHC", receipientName: "Ama", receipientEmail: "ama@example.com", senderName: "Jane Smith", initialStatus: "paid" },
-];
+import { fetchGroupBills } from "../../services/api";
 
 const groupNames = {
   "1": "Roommates",
@@ -28,11 +23,48 @@ const groupInfos = {
   "4": { description: "Family vacation and household expenses", category: "Family", members: 5, created: "Dec 2023" },
 };
 
+const groupMembers = {
+  "1": [
+    { id: "1", name: "John Doe", handle: "@johnd", initials: "JD", avatarColor: "#fbb81c", role: "Admin" },
+    { id: "2", name: "Jane Smith", handle: "@janes", initials: "JS", avatarColor: "#3b82f6", role: "Member" },
+    { id: "3", name: "Mike Wilson", handle: "@mikew", initials: "MW", avatarColor: "#10b981", role: "Member" },
+    { id: "4", name: "Sarah Johnson", handle: "@sarahj", initials: "SJ", avatarColor: "#8b5cf6", role: "Member" },
+  ],
+  "2": [
+    { id: "1", name: "John Doe", handle: "@johnd", initials: "JD", avatarColor: "#fbb81c", role: "Admin" },
+    { id: "5", name: "Emily Davis", handle: "@emilyd", initials: "ED", avatarColor: "#ec4899", role: "Member" },
+    { id: "6", name: "Kofi Mensah", handle: "@kofim", initials: "KM", avatarColor: "#06b6d4", role: "Member" },
+    { id: "7", name: "Fatima Al-Hassan", handle: "@fatima", initials: "FA", avatarColor: "#f97316", role: "Member" },
+    { id: "8", name: "Kwame Asante", handle: "@kwamea", initials: "KA", avatarColor: "#84cc16", role: "Member" },
+    { id: "9", name: "Ama Aboagye", handle: "@amaa", initials: "AA", avatarColor: "#f97316", role: "Member" },
+  ],
+  "3": [
+    { id: "1", name: "John Doe", handle: "@johnd", initials: "JD", avatarColor: "#fbb81c", role: "Admin" },
+    { id: "2", name: "Jane Smith", handle: "@janes", initials: "JS", avatarColor: "#3b82f6", role: "Member" },
+    { id: "3", name: "Mike Wilson", handle: "@mikew", initials: "MW", avatarColor: "#10b981", role: "Member" },
+    { id: "4", name: "Sarah Johnson", handle: "@sarahj", initials: "SJ", avatarColor: "#8b5cf6", role: "Member" },
+    { id: "5", name: "Emily Davis", handle: "@emilyd", initials: "ED", avatarColor: "#ec4899", role: "Member" },
+    { id: "6", name: "Kofi Mensah", handle: "@kofim", initials: "KM", avatarColor: "#06b6d4", role: "Member" },
+    { id: "7", name: "Fatima Al-Hassan", handle: "@fatima", initials: "FA", avatarColor: "#f97316", role: "Member" },
+    { id: "8", name: "Kwame Asante", handle: "@kwamea", initials: "KA", avatarColor: "#84cc16", role: "Member" },
+  ],
+  "4": [
+    { id: "1", name: "John Doe", handle: "@johnd", initials: "JD", avatarColor: "#fbb81c", role: "Admin" },
+    { id: "2", name: "Jane Smith", handle: "@janes", initials: "JS", avatarColor: "#3b82f6", role: "Member" },
+    { id: "4", name: "Sarah Johnson", handle: "@sarahj", initials: "SJ", avatarColor: "#8b5cf6", role: "Member" },
+    { id: "9", name: "Ama Aboagye", handle: "@amaa", initials: "AA", avatarColor: "#f97316", role: "Member" },
+    { id: "10", name: "Daniel Osei", handle: "@danielo", initials: "DO", avatarColor: "#3b82f6", role: "Member" },
+  ],
+};
+
 export default function GroupDetails() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [bills, setBills] = useState(initialBills);
+  const [bills, setBills] = useState([]);
+  const [billsLoading, setBillsLoading] = useState(true);
+  const [billsError, setBillsError] = useState(false);
+  const [totalsPeriod, setTotalsPeriod] = useState("All");
   const [isPaymentVisible, setPaymentVisible] = useState(false);
   const [paymentCard, setPaymentCard] = useState(null);
   const [isKebabVisible, setKebabVisible] = useState(false);
@@ -40,10 +72,92 @@ export default function GroupDetails() {
   const [activeTab, setActiveTab] = useState("expenses");
   const { setMode, setCustomButtons } = useTabBarStore();
 
+  useEffect(() => {
+    let cancelled = false;
+    setBillsLoading(true);
+    setBillsError(false);
+    fetchGroupBills(id)
+      .then((data) => {
+        if (!cancelled) {
+          setBills(data);
+          setBillsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBillsError(true);
+          setBillsLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [id]);
+
   const groupName = groupNames[id] || "Group";
   const groupInfo = groupInfos[id] || { description: "", category: "Other", members: 1, created: "Now" };
+  const members = groupMembers[id] || [];
 
   const tabs = ["expenses", "balances", "totals", "info"];
+
+  const currentUser = "John Doe";
+
+  const formatBarAmount = (val) => {
+    const n = Number(val) || 0;
+    const sign = n < 0 ? "-" : "+";
+    return `${sign}\u20B5${Math.abs(n).toFixed(2)}`;
+  };
+
+  const parseAmount = (amt) => {
+    const n = parseFloat((amt || "0").replace(/[^0-9.\-]/g, ""));
+    return isNaN(n) ? 0 : n;
+  };
+
+  const computeBalances = () => {
+    const balances = {};
+    members.forEach((m) => { balances[m.name] = 0; });
+    if (!balances[currentUser]) balances[currentUser] = 0;
+
+    bills.forEach((bill) => {
+      const amount = parseAmount(bill.amount);
+      if (bill.initialStatus === "pay") {
+        // current user owes the recipient
+        balances[bill.receipientName] = (balances[bill.receipientName] || 0) + amount;
+        balances[currentUser] = (balances[currentUser] || 0) - amount;
+      } else if (bill.initialStatus === "request") {
+        // sender owes the current user
+        balances[bill.senderName] = (balances[bill.senderName] || 0) - amount;
+        balances[currentUser] = (balances[currentUser] || 0) + amount;
+      }
+      // 'paid' => settled, no outstanding balance
+    });
+
+    return balances;
+  };
+
+  const balances = computeBalances();
+  const entries = Object.entries(balances)
+    .map(([name, net]) => ({ name, net }))
+    .filter((e) => e.net !== 0)
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  const outstandingBills = bills.filter((bill) => bill.initialStatus !== "paid");
+  const maxAbs = Math.max(...entries.map((e) => Math.abs(e.net)), 1);
+
+  const totalsPeriods = ["All", "1D", "1W", "4W", "3M", "1Y"];
+
+  const totalGroupSpending = bills.reduce(
+    (sum, bill) => sum + parseAmount(bill.amount),
+    0
+  );
+  const totalYouPaid = bills
+    .filter((bill) => bill.senderName === currentUser)
+    .reduce((sum, bill) => sum + parseAmount(bill.amount), 0);
+  const yourTotalShare = bills
+    .filter((bill) => bill.receipientName === currentUser)
+    .reduce((sum, bill) => sum + parseAmount(bill.amount), 0);
+
+  const formatTotal = (val) => {
+    const n = Number(val) || 0;
+    return `\u20B5${n.toFixed(2)}`;
+  };
 
   const handlePayPress = (card) => {
     setPaymentCard(card);
@@ -149,49 +263,213 @@ export default function GroupDetails() {
         )}
 
         {activeTab === "balances" && (
-          <View style={styles.tabContent}>
-            <Text style={styles.tabContentTitle}>Balances</Text>
-            <Text style={styles.tabContentSubtitle}>Balance summary will be shown here</Text>
-            {/* TODO: Add balance calculations per member */}
-          </View>
+          billsLoading ? (
+            <View style={styles.centeredContent}>
+              <Text style={styles.emptyBalances}>Loading balances...</Text>
+            </View>
+          ) : billsError ? (
+            <View style={styles.centeredContent}>
+              <Text style={styles.emptyBalances}>Couldn't load balances</Text>
+            </View>
+          ) : entries.length === 0 ? (
+            <View style={styles.centeredContent}>
+              <Text style={styles.emptyBalances}>All settled up!</Text>
+            </View>
+          ) : (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.tabContent}>
+              <View style={styles.chartContainer}>
+                {entries.map((entry) => {
+                  const isOwing = entry.net < 0;
+                  const pct = Math.max(
+                    (Math.abs(entry.net) / maxAbs) * 100,
+                    30
+                  );
+                  const amountStr = formatBarAmount(entry.net);
+                  const barMinWidth = Math.ceil(amountStr.length * 8) + 24;
+                  const isYou = entry.name === currentUser;
+                  return (
+                    <View key={entry.name} style={styles.barRow}>
+                      {isOwing ? (
+                        <>
+                          <View style={styles.barSide}>
+                            <View
+                              style={[
+                                styles.bar,
+                                styles.barRed,
+                                { width: `${pct}%`, minWidth: barMinWidth },
+                              ]}
+                            >
+                              <Text style={[styles.barAmountIn, styles.barAmountInOwe]} numberOfLines={1}>
+                                {formatBarAmount(entry.net)}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.centerLine} />
+                          <View style={[styles.barSide, styles.barLabelSide]}>
+                            <Text
+                              style={[styles.barName, isYou && styles.barNameYou]}
+                              numberOfLines={1}
+                            >
+                              {entry.name}
+                              {isYou ? " (you)" : ""}
+                            </Text>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <View style={[styles.barSide, styles.barLabelSide]}>
+                            <Text
+                              style={[styles.barName, isYou && styles.barNameYou]}
+                              numberOfLines={1}
+                            >
+                              {entry.name}
+                              {isYou ? " (you)" : ""}
+                            </Text>
+                          </View>
+                          <View style={styles.centerLine} />
+                          <View style={styles.barSide}>
+                            <View
+                              style={[
+                                styles.bar,
+                                styles.barGreen,
+                                { width: `${pct}%`, minWidth: barMinWidth },
+                              ]}
+                            >
+                              <Text style={styles.barAmountIn} numberOfLines={1}>
+                                {formatBarAmount(entry.net)}
+                              </Text>
+                            </View>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View style={{ marginTop: 24 }}>
+              {outstandingBills.map((bill) => (
+                <ActivityCard
+                  key={bill.id}
+                  title={bill.title}
+                  amount={bill.amount}
+                  receipientName={bill.receipientName}
+                  receipientEmail={bill.receipientEmail}
+                  senderName={bill.senderName}
+                  initialStatus={bill.initialStatus}
+                  onPayPress={handlePayPress}
+                />
+              ))}
+              </View>
+            </ScrollView>
+          )
         )}
 
         {activeTab === "totals" && (
-          <View style={styles.tabContent}>
-            <Text style={styles.tabContentTitle}>Totals</Text>
-            <Text style={styles.tabContentSubtitle}>Total expenses and statistics</Text>
-            {/* TODO: Add totals calculations */}
-          </View>
+            <View style={[styles.tabContent, { flex: 1 }]}>
+             <View style={styles.totalsPills}>
+               {totalsPeriods.map((period) => (
+                 <TouchableOpacity
+                   key={period}
+                   style={[
+                     styles.totalsPill,
+                     totalsPeriod === period && styles.totalsPillActive,
+                   ]}
+                   onPress={() => setTotalsPeriod(period)}
+                 >
+                   <Text
+                     style={[
+                       styles.totalsPillText,
+                       totalsPeriod === period && styles.totalsPillTextActive,
+                     ]}
+                   >
+                     {period}
+                   </Text>
+                 </TouchableOpacity>
+               ))}
+             </View>
+
+             <View style={styles.totalsCard}>
+               <Text style={styles.totalsCardTitle}>Total group spending</Text>
+               <Text style={styles.totalsCardAmount}>{formatTotal(totalGroupSpending)}</Text>
+             </View>
+
+             <View style={styles.totalsCard}>
+               <Text style={styles.totalsCardTitle}>Total you paid for</Text>
+               <Text style={styles.totalsCardAmount}>{formatTotal(totalYouPaid)}</Text>
+             </View>
+
+             <View style={styles.totalsCard}>
+               <Text style={styles.totalsCardTitle}>Your total share</Text>
+               <Text style={styles.totalsCardAmount}>{formatTotal(yourTotalShare)}</Text>
+             </View>
+           </View>
         )}
 
         {activeTab === "info" && (
-          <ScrollView contentContainerStyle={styles.infoContent}>
-            <View style={styles.infoSection}>
-              <Text style={styles.infoSectionTitle}>About this group</Text>
-              <Text style={styles.infoText}>{groupInfo.description || "No description provided"}</Text>
-            </View>
+          <FlatList
+            data={members}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.memberRow}>
+                <View style={[styles.memberAvatar, { backgroundColor: item.avatarColor }]}>
+                  <Text style={styles.memberAvatarText}>{item.initials}</Text>
+                </View>
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{item.name}</Text>
+                  <Text style={styles.memberHandle}>{item.handle}</Text>
+                </View>
+                <View style={styles.memberRole}>
+                  <View style={[
+                    styles.roleBadge,
+                    item.role === "Admin" && styles.roleBadgeAdmin,
+                  ]}>
+                    <Text style={[
+                      styles.roleBadgeText,
+                      item.role === "Admin" && styles.roleBadgeTextAdmin,
+                    ]}>
+                      {item.role}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.memberSeparator} />}
+            ListHeaderComponent={
+              <View style={styles.infoContent}>
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoSectionTitle}>About this group</Text>
+                  <Text style={styles.infoText}>{groupInfo.description || "No description provided"}</Text>
+                </View>
 
-            <View style={styles.infoSection}>
-              <Text style={styles.infoSectionTitle}>Details</Text>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Category</Text>
-                <Text style={styles.infoValue}>{groupInfo.category}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Members</Text>
-                <Text style={styles.infoValue}>{groupInfo.members} people</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Created</Text>
-                <Text style={styles.infoValue}>{groupInfo.created}</Text>
-              </View>
-            </View>
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoSectionTitle}>Details</Text>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Category</Text>
+                    <Text style={styles.infoValue}>{groupInfo.category}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Members</Text>
+                    <Text style={styles.infoValue}>{groupInfo.members} people</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Created</Text>
+                    <Text style={styles.infoValue}>{groupInfo.created}</Text>
+                  </View>
+                </View>
 
-            <View style={styles.infoSection}>
-              <Text style={styles.infoSectionTitle}>Members</Text>
-              <Text style={styles.infoText}>Member list and management coming soon</Text>
-            </View>
-          </ScrollView>
+                <View style={styles.infoSection}>
+                  <View style={styles.infoSectionHeader}>
+                    <Text style={styles.infoSectionTitle}>Members</Text>
+                    <TouchableOpacity style={styles.addMemberBtn}>
+                      <UserPlus size={18} color="#fbb81c" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            }
+            ListFooterComponentStyle={styles.memberListHeader}
+          />
         )}
 
         {isKebabVisible && (
@@ -402,14 +680,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  tabPills: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2b30',
-  },
+   tabPills: {
+     flexDirection: 'row',
+     paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginBottom: 8,
+      gap: 8,
+     borderBottomWidth: 1,
+     borderBottomColor: '#2a2b30',
+   },
   tabPill: {
     flex: 1,
     paddingVertical: 10,
@@ -428,12 +707,68 @@ const styles = StyleSheet.create({
   tabPillTextActive: {
     color: '#16171b',
   },
-  tabContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingTop: 60,
+   tabContent: {
+     paddingHorizontal: 0,
+   },
+   centeredContent: {
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+     paddingHorizontal: 16,
+   },
+   totalsPills: {
+     flexDirection: 'row',
+     gap: 8,
+     paddingHorizontal: 16,
+     paddingBottom: 16,
+   },
+   totalsPill: {
+     paddingHorizontal: 14,
+     paddingVertical: 8,
+     borderRadius: 20,
+     backgroundColor: '#2a2b30',
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+   totalsPillActive: {
+     backgroundColor: '#fbb81c',
+   },
+   totalsPillText: {
+     color: '#ffffff',
+     fontSize: 13,
+     fontWeight: '600',
+   },
+   totalsPillTextActive: {
+     color: '#16171b',
+   },
+   totalsCard: {
+     backgroundColor: '#222327',
+     borderRadius: 12,
+     padding: 16,
+     marginHorizontal: 16,
+     marginBottom: 12,
+     borderWidth: 1,
+     borderColor: '#33353b',
+   },
+   totalsCardTitle: {
+     color: '#8e8e93',
+     fontSize: 13,
+     fontWeight: '600',
+     textTransform: 'uppercase',
+     marginBottom: 4,
+   },
+   totalsCardAmount: {
+     color: '#ffffff',
+     fontSize: 20,
+     fontWeight: 'bold',
+   },
+  sectionLabel: {
+    color: '#8e8e93',
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
   tabContentTitle: {
     color: '#ffffff',
@@ -445,6 +780,83 @@ const styles = StyleSheet.create({
     color: '#8e8e93',
     fontSize: 14,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyBalances: {
+    color: '#8e8e93',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+   chartContainer: {
+     width: '100%',
+     paddingHorizontal: 16,
+     paddingVertical: 16,
+     gap: 14,
+     backgroundColor: '#222327',
+     borderRadius: 12,
+     borderWidth: 1,
+     borderColor: '#33353b',
+   },
+  chartWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    gap: 14,
+  },
+   barRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     height: 64,
+     width: '100%',
+     overflow: 'visible',
+   },
+   barSide: {
+     flex: 1,
+     height: '100%',
+     justifyContent: 'center',
+     overflow: 'visible',
+   },
+   barLabelSide: {
+     flex: 0.5,
+     paddingHorizontal: 8,
+   },
+    bar: {
+      height: 48,
+      borderRadius: 8,
+      justifyContent: 'center',
+      paddingHorizontal: 4,
+    },
+  barRed: {
+    backgroundColor: '#ff6b6b',
+    alignSelf: 'flex-end',
+  },
+   barGreen: {
+     backgroundColor: '#10b981',
+     alignSelf: 'flex-start',
+   },
+   barAmountIn: {
+     color: '#ffffff',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   barAmountInOwe: {
+     textAlign: 'right',
+   },
+  barName: {
+    color: '#8e8e93',
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 110,
+    textAlign: 'center',
+  },
+  barNameYou: {
+    color: '#fbb81c',
+  },
+  centerLine: {
+    width: 2,
+    height: '100%',
+    backgroundColor: '#33353b',
   },
   infoContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40, gap: 20 },
   infoSection: { gap: 12 },
@@ -453,6 +865,20 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#2a2b30' },
   infoLabel: { color: '#8e8e93', fontSize: 15 },
   infoValue: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
+  infoSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  addMemberBtn: { padding: 8 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  memberAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  memberAvatarText: { color: '#16171b', fontSize: 15, fontWeight: 'bold' },
+  memberInfo: { flex: 1 },
+  memberName: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
+  memberHandle: { color: '#8e8e93', fontSize: 12, marginTop: 2 },
+  memberRole: { marginLeft: 12 },
+  roleBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: '#2a2b30' },
+  roleBadgeAdmin: { backgroundColor: '#fbb81c' },
+  roleBadgeText: { color: '#ffffff', fontSize: 11, fontWeight: '600' },
+  roleBadgeTextAdmin: { color: '#16171b' },
+  memberSeparator: { height: 1, backgroundColor: '#2a2b30', marginLeft: 56 },
   fab: {
     position: "absolute",
     bottom: 32,

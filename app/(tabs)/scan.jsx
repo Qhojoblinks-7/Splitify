@@ -12,10 +12,12 @@ import { ChevronLeft } from "lucide-react-native";
 import BottomSheet from "../../components/molecule/BottomSheet";
 import BaseButton from "../../components/atoms/BaseButton";
 import { useTabBarStore } from "../../store/tabBar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SCANNER_SIZE = 260;
 
 export default function Scan() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { setMode, setCustomButtons } = useTabBarStore();
   const [permission, requestPermission] = useCameraPermissions();
@@ -114,7 +116,7 @@ export default function Scan() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <ChevronLeft size={24} color="#fbb81c" />
@@ -214,8 +216,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingVertical: 16,
   },
   backBtn: {
     padding: 8,
@@ -242,6 +243,7 @@ const styles = StyleSheet.create({
   scannerFrame: {
     width: SCANNER_SIZE,
     height: SCANNER_SIZE,
+    position: "relative",
     justifyContent: "center",
     alignItems: "center",
   },
