@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Pressable, TextInput, Image, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Plus, Users, ChevronRight, Search, MoreVertical, ChevronLeft, Camera, X, Tag, CheckCircle2, UserPlus } from "lucide-react-native";
@@ -47,6 +47,17 @@ export default function GroupsScreen() {
   const [selectedContacts, setSelectedContacts] = useState([]);
   const { setMode, setCustomButtons } = useTabBarStore();
 
+  const groupTitleRef = useRef("");
+  const selectedContactsRef = useRef([]);
+
+  useEffect(() => {
+    groupTitleRef.current = groupTitle;
+  }, [groupTitle]);
+
+  useEffect(() => {
+    selectedContactsRef.current = selectedContacts;
+  }, [selectedContacts]);
+
   const filteredGroups = groups.filter((group) =>
     group.name.toLowerCase().includes(searchText.toLowerCase())
   );
@@ -67,7 +78,7 @@ export default function GroupsScreen() {
     setCustomButtons([
       { label: "Cancel", variant: "cancel", onPress: () => { setCreateVisible(false); setMode("tabs"); setCustomButtons([]); } },
       { label: "Continue", variant: "primary", onPress: () => {
-          if (groupTitle.trim()) {
+          if (groupTitleRef.current.trim()) {
             setCreateVisible(false);
             setAddMembersVisible(true);
             setCustomButtons([
@@ -78,7 +89,7 @@ export default function GroupsScreen() {
                   setCustomButtons([]); 
                 } },
               { label: "Add Members", variant: "primary", onPress: () => {
-                  createGroupWithMembers(selectedContacts);
+                  createGroupWithMembers(selectedContactsRef.current);
                   setAddMembersVisible(false);
                   setMode("tabs");
                   setCustomButtons([]);
@@ -92,7 +103,7 @@ export default function GroupsScreen() {
   const createGroupWithMembers = (members) => {
     const newGroup = {
       id: String(Date.now()),
-      name: groupTitle,
+       name: groupTitleRef.current,
       memberCount: 1 + members.length,
       totalExpenses: "0.00 GHC",
       color: "#fbb81c",
