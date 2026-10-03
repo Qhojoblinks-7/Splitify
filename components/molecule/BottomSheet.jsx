@@ -1,98 +1,194 @@
-import React, { useRef, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   Animated,
-  PanResponder,
-  TouchableOpacity,
-  Dimensions,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
-const SNAP_HEIGHT = SCREEN_HEIGHT * 0.9;
+const DEFAULT_HEIGHT = "92%";
+
+const BACKDROP_MAX_OPACITY = 0.6;
+const DISMISS_DISTANCE_RATIO = 0.3;
+const DISMISS_VELOCITY = 0.6;
+const VELOCITY_PROJECTION = 180;
+const MIN_BOTTOM_GAP = 12;
+
+const SPRING_CONFIG = {
+  damping: 26,
+  stiffness: 240,
+  mass: 0.85,
+  overshootClamping: true,
+  restDisplacementThreshold: 0.5,
+  restSpeedThreshold: 2,
+};
+
+function resolvePanelHeight(value, viewport) {
+  if (!viewport) return 0;
+  const ratio = typeof value === "number" ? value : parseFloat(String(value).replace("%", "")) / 100;
+  const safeRatio = Number.isFinite(ratio) && ratio > 0 && ratio <= 1 ? ratio : 0.92;
+  return Math.min(viewport * safeRatio, viewport);
+}
 
 export default function BottomSheet({
   isVisible,
   onClose,
   title,
   children,
+  height = DEFAULT_HEIGHT,
+  bottomInset = 0,
 }) {
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const insets = useSafeAreaInsets();
+  const { height: viewport } = useWindowDimensions();
+
+  // `bottomInset` covers chrome that overlays this surface from below, such as
+  // a tab navigator bar, which the safe-area inset alone does not describe.
+  const bottomPadding = Math.max(insets.bottom + bottomInset, MIN_BOTTOM_GAP);
+
+  const [isRendered, setIsRendered] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const panelHeight = useMemo(() => resolvePanelHeight(height, viewport), [height, viewport]);
+
+  const offsetRef = useRef(null);
+  if (offsetRef.current === null) {
+    offsetRef.current = new Animated.Value(0);
+  }
+  const offset = offsetRef.current;
+
+  const offsetRefValue = useRef(0);
+  const dragStartRef = useRef(0);
+  const isDragging = useRef(false);
+  const isOpenRef = useRef(false);
+
+  const animate = useCallback(
+    (toValue, velocity = 0, onComplete) => {
+      const clamped = Math.max(toValue, 0);
+      offsetRefValue.current = clamped;
+      Animated.spring(offset, {
+        toValue: clamped,
+        velocity,
+        useNativeDriver: false,
+        ...SPRING_CONFIG,
+      }).start(({ finished }) => {
+        if (finished && onComplete) onComplete();
+      });
+    },
+    [offset],
+  );
+
+  const requestClose = useCallback(() => {
+    if (isDragging.current) return;
+    onClose?.();
+  }, [onClose]);
 
   useEffect(() => {
     if (isVisible) {
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        friction: 8,
-        tension: 100,
-      }).start();
-    } else {
-      Animated.spring(translateY, {
-        toValue: SCREEN_HEIGHT,
-        useNativeDriver: true,
-        friction: 8,
-        tension: 100,
-      }).start();
+      setIsRendered(true);
     }
-  }, [isVisible, translateY]);
+  }, [isVisible]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-      onPanResponderMove: (_, gesture) => {
-        const nextPosition = Math.max(
-          0,
-          Math.min(SCREEN_HEIGHT, gesture.dy)
-        );
-        translateY.setValue(nextPosition);
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 80 || gesture.vy > 0.5) {
-          onClose();
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 8,
-            tension: 100,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  useEffect(() => {
+    if (!isRendered) return;
 
-  if (!isVisible) {
+    if (isVisible) {
+      if (panelHeight <= 0) return;
+      isOpenRef.current = true;
+      setIsOpen(true);
+      animate(0);
+    } else if (isOpenRef.current) {
+      isOpenRef.current = false;
+      setIsOpen(false);
+      animate(panelHeight, 0, () => setIsRendered(false));
+    }
+  }, [animate, isRendered, isVisible, panelHeight]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.2,
+        onPanResponderGrant: () => {
+          offset.stopAnimation();
+          dragStartRef.current = offsetRefValue.current;
+          isDragging.current = true;
+        },
+        onPanResponderMove: (_, gesture) => {
+          const next = Math.max(
+            Math.min(dragStartRef.current + gesture.dy, panelHeight),
+            0,
+          );
+          offsetRefValue.current = next;
+          offset.setValue(next);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          isDragging.current = false;
+          const projected = offsetRefValue.current + gesture.vy * VELOCITY_PROJECTION;
+          if (gesture.vy > DISMISS_VELOCITY || projected > panelHeight * DISMISS_DISTANCE_RATIO) {
+            requestClose();
+            return;
+          }
+          animate(0, gesture.vy);
+        },
+        onPanResponderTerminate: () => {
+          isDragging.current = false;
+          animate(0);
+        },
+      }),
+    [animate, offset, panelHeight, requestClose],
+  );
+
+  const backdropOpacity = useMemo(
+    () =>
+      offset.interpolate({
+        inputRange: [0, Math.max(panelHeight, 1)],
+        outputRange: [BACKDROP_MAX_OPACITY, 0],
+        extrapolate: "clamp",
+      }),
+    [offset, panelHeight],
+  );
+
+  if (!isRendered || panelHeight <= 0) {
     return null;
   }
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <Animated.View style={[styles.backdropInner, { opacity: translateY.interpolate({ inputRange: [0, SCREEN_HEIGHT], outputRange: [0.5, 0] }) }]} />
-      </TouchableOpacity>
+    <View style={styles.root} pointerEvents={isOpen ? "box-none" : "none"}>
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={requestClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        />
+      </Animated.View>
 
       <Animated.View
-        style={[styles.sheet, { transform: [{ translateY: translateY }] }]}
-        {...panResponder.panHandlers}
+        style={[
+          styles.sheet,
+          {
+            height: panelHeight,
+            paddingBottom: bottomPadding,
+            transform: [{ translateY: offset }],
+          },
+        ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.sheetContent}
-        >
+        <View {...panResponder.panHandlers} style={styles.grabberArea}>
           <View style={styles.handle} />
+          {title ? <Text style={styles.title}>{title}</Text> : null}
+        </View>
 
-          {title && <Text style={styles.title}>{title}</Text>}
-
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.body}
+        >
           {children}
         </KeyboardAvoidingView>
       </Animated.View>
@@ -101,57 +197,49 @@ export default function BottomSheet({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    zIndex: 999,
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    elevation: 100,
   },
   backdrop: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  backdropInner: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000000",
   },
   sheet: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
-    height: SNAP_HEIGHT,
+    bottom: 0,
     backgroundColor: "#16171b",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-    shadowColor: "#000",
+    overflow: "hidden",
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 12,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 24,
+  },
+  grabberArea: {
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   handle: {
-    width: 40,
+    width: 36,
     height: 4,
-    backgroundColor: "#33353b",
     borderRadius: 2,
+    backgroundColor: "#3a3c42",
     alignSelf: "center",
-    marginBottom: 16,
   },
   title: {
+    marginTop: 14,
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: "#ffffff",
-    marginBottom: 16,
     textAlign: "center",
   },
-  sheetContent: {
+  body: {
     flex: 1,
   },
 });

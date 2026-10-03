@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Splitify",
-    "slug": "Splitify",
+    "name": "Growl",
+    "slug": "growl",
     "version": "1.0.0",
-    "scheme": "splitify",
+    "scheme": "growl",
     "backgroundColor": "#16171b",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true

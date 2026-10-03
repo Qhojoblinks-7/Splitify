@@ -1,8 +1,15 @@
 # State Management — Implementation Plan
 
+**Scope: group susu only.**
+
 ## Context
 
-Splitify needs state management across: authentication, balances, groups, bills, payments, USSD sessions, susu groups, savings pockets, and notifications. AGENTS.md specifies TanStack Query v5 (server state) and Zustand v5 (global client state).
+Growl needs state management for exactly four things: **auth**, **susu groups**, **contributions
+and rounds**, and **notifications**. AGENTS.md specifies TanStack Query v5 (server state) and
+Zustand v5 (global client state).
+
+Dropped from the original scope: balances, bills/expenses, send/request money, savings pockets,
+USSD sessions. None of those products exist.
 
 ## Decisions Resolved
 
@@ -10,10 +17,10 @@ Splitify needs state management across: authentication, balances, groups, bills,
 |----------|--------|
 | Server state | TanStack Query v5 |
 | Global client state | Zustand v5 |
-| Local state | React useState/useReducer |
-| Persistence | Zustand persist + SecureStore for auth, AsyncStorage for preferences |
-| Optimistic updates | TanStack Query mutations (onMutate/onError rollback) |
-| Offline queue | AsyncStorage |
+| Local state | React `useState` / `useReducer` |
+| Persistence | Zustand persist + SecureStore for auth, AsyncStorage for preferences and the offline queue |
+| Optimistic updates | Susu contributions and marks only |
+| **Offline queue** | **AsyncStorage — first-class, not an afterthought.** Signal drops constantly in Ghana markets. This is our clearest advantage over every competitor. |
 
 ## Zustand Stores
 
@@ -25,13 +32,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as SecureStore from 'expo-secure-store';
 
-const useAuthStore = create(
+export const useAuthStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
-      // NOTE: token is NOT stored in persist (AsyncStorage).
-      // Token lives only in SecureStore (encrypted) and in-memory via set during login.
-      // onRehydrateStorage checks SecureStore for token on app start.
+      // Token is NOT in the AsyncStorage persist payload. It lives only in SecureStore.
       isAuthenticated: false,
       login: async (user, token) => {
         await SecureStore.setItemAsync('token', token);
@@ -41,21 +46,19 @@ const useAuthStore = create(
         await SecureStore.deleteItemAsync('token');
         set({ user: null, token: null, isAuthenticated: false });
       },
-      updateUser: (updates) => set((state) => ({ user: { ...state.user, ...updates } })),
+      updateUser: (updates) =>
+        set((state) => ({ user: { ...state.user, ...updates } })),
     }),
     {
       name: 'auth-storage',
-      // Exclude token from AsyncStorage persistence
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        // token is intentionally excluded
       }),
       onRehydrateStorage: () => async (state) => {
-        // On app start, check SecureStore for existing token
         const token = await SecureStore.getItemAsync('token');
         if (token && state) {
-          const user = await api.get('/api/auth/me').then(r => r.data.user);
+          const user = await api.get('/api/auth/me').then((r) => r.data.user);
           state.login(user, token);
         }
       },
@@ -71,15 +74,14 @@ const useAuthStore = create(
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const useUIStore = create(
+export const useUIStore = create(
   persist(
     (set) => ({
       theme: 'dark',
-      currency: 'GHC',
       notificationsEnabled: true,
-      activeTab: 'home',
+      activeTab: 'susu',
       setTheme: (theme) => set({ theme }),
-      setCurrency: (currency) => set({ currency }),
+      setNotificationsEnabled: (on) => set({ notificationsEnabled: on }),
       setActiveTab: (tab) => set({ activeTab: tab }),
     }),
     { name: 'ui-storage' }
@@ -87,50 +89,48 @@ const useUIStore = create(
 );
 ```
 
-### USSD Session Store
+### Offline Queue Store
+
+**The most important store in the app.** A collector logging a contribution in a market with no
+signal must be able to record it and have it sync later. If we get this wrong, real Ghanaian
+markets cannot use the product.
 
 ```javascript
-// stores/ussdStore.js
-import { create } from 'zustand';
-
-const useUSSDStore = create((set) => ({
-  activeSession: null,        // { sessionId, phoneNumber, menuState, sessionData }
-  setSession: (session) => set({ activeSession: session }),
-  updateSessionData: (data) => set((state) => ({
-    activeSession: { ...state.activeSession, sessionData: { ...state.activeSession.sessionData, ...data } },
-  })),
-  clearSession: () => set({ activeSession: null }),
-}));
-```
-
-### Transaction Queue Store (Offline)
-
-```javascript
-// stores/transactionQueueStore.js
+// stores/offlineQueueStore.js
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const useTransactionQueueStore = create(
+export const useOfflineQueueStore = create(
   persist(
     (set) => ({
-      pendingTransactions: [],   // [{ id, type, data, timestamp, retries }]
-      setPendingTransactions: (transactions) => set({ pendingTransactions: transactions }),
-      addTransaction: (tx) => set((state) => ({
-        pendingTransactions: [...state.pendingTransactions, { ...tx, retries: 0, timestamp: Date.now() }],
-      })),
-      removeTransaction: (id) => set((state) => ({
-        pendingTransactions: state.pendingTransactions.filter((t) => t.id !== id),
-      })),
-      incrementRetry: (id) => set((state) => ({
-        pendingTransactions: state.pendingTransactions.map((t) =>
-          t.id === id ? { ...t, retries: t.retries + 1 } : t
-        ),
-      })),
+      // [{ id, groupId, type, payload, createdAt, retries, status }]
+      // type: 'contribution' | 'verify' | 'flag' | 'payout'
+      queue: [],
+      enqueue: (item) =>
+        set((state) => ({
+          queue: [
+            ...state.queue,
+            { ...item, id: `q-${Date.now()}-${Math.random()}`, retries: 0, status: 'pending', createdAt: Date.now() },
+          ],
+        })),
+      markSynced: (id) =>
+        set((state) => ({ queue: state.queue.filter((q) => q.id !== id) })),
+      incrementRetry: (id) =>
+        set((state) => ({
+          queue: state.queue.map((q) =>
+            q.id === id ? { ...q, retries: q.retries + 1 } : q
+          ),
+        })),
+      clear: () => set({ queue: [] }),
     }),
-    { name: 'tx-queue-storage' }
+    { name: 'offline-queue-storage' }
   )
 );
 ```
+
+**Note on duplicates.** A contribution queued offline could be replayed after a partial network
+failure. Every queue item must carry a **client-generated idempotency key** that the backend
+treats as unique, so a replay can never create a second contribution.
 
 ## Axios Instance
 
@@ -141,15 +141,17 @@ import { useAuthStore } from '../stores/authStore';
 import { queryClient } from './queryClient';
 import * as SecureStore from 'expo-secure-store';
 
-const api = axios.create({
-  baseURL: 'http://localhost:8000',
+export const api = axios.create({
+  baseURL: 'https://api.growl.example',
   timeout: 15000,
 });
 
 api.interceptors.request.use(async (config) => {
   const token = await SecureStore.getItemAsync('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Attach the idempotency key for any queued write
+  if (config.headers['X-Idempotency-Key']) {
+    config.headers['X-Idempotency-Key'] = config.headers['X-Idempotency-Key'];
   }
   return config;
 });
@@ -177,211 +179,130 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,     // 5 minutes
-      gcTime: 30 * 60 * 1000,       // 30 minutes garbage collection
-      refetchOnWindowFocus: true,    // refresh when app regains focus
+      staleTime: 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: true,
       retry: (failureCount, error) => {
-        if (error?.status === 401) return false;  // don't retry auth errors
+        if (error?.status === 401) return false;
         return failureCount < 2;
       },
     },
-    mutations: {
-      retry: 1,
-      onSettled: () => {
-        // Invalidate relevant queries after mutation settles
-      },
-    },
+    mutations: { retry: 1 },
   },
 });
 ```
 
-## Token Refresh
-
-```javascript
-// lib/tokenRefresh.js
-let isRefreshing = false;
-let failedRequestsQueue = [];
-
-const processQueue = (error, token = null) => {
-  failedRequestsQueue.forEach(({ resolve, reject }) => {
-    if (error) reject(error); else resolve(token);
-  });
-  failedRequestsQueue = [];
-};
-
-// Add to api.js response interceptor:
-// On 401: queue requests, refresh token, replay queue
-```
-
 ## Query Definitions
 
-### Auth Queries
+### Auth
 
 | Query Key | Endpoint | Stale Time |
 |-----------|----------|------------|
 | `['auth', 'me']` | GET `/api/auth/me` | 2 min |
 
-### Balance Queries
-
-| Query Key | Endpoint | Stale Time |
-|-----------|----------|------------|
-| `['balance']` | GET `/api/balance/` | 1 min |
-
-### Group Queries
-
-| Query Key | Endpoint | Stale Time |
-|-----------|----------|------------|
-| `['groups']` | GET `/api/groups/` | 5 min |
-| `['group', groupId]` | GET `/api/groups/:id/` | 2 min |
-| `['group', groupId, 'members']` | GET `/api/groups/:id/members/` | 5 min |
-| `['group', groupId, 'balances']` | GET `/api/groups/:id/balances/` | 1 min |
-
-### Bill/Expense Queries
-
-| Query Key | Endpoint | Stale Time |
-|-----------|----------|------------|
-| `['bills', 'group', groupId]` | GET `/api/bills/?group=groupId` | 2 min |
-| `['bill', billId]` | GET `/api/bills/:id/` | 2 min |
-
-### Payment Queries
-
-| Query Key | Endpoint | Stale Time |
-|-----------|----------|------------|
-| `['transactions']` | GET `/api/transactions/` | 2 min |
-| `['transaction', txId]` | GET `/api/transactions/:id/` | 2 min |
-
-### Susu Queries
+### Susu
 
 | Query Key | Endpoint | Stale Time |
 |-----------|----------|------------|
 | `['susu']` | GET `/api/susu/` | 2 min |
-| `['susu', susuId]` | GET `/api/susu/:id/` | 1 min |
-| `['susu', susuId, 'contributions']` | GET `/api/susu/:id/contributions/` | 30 sec |
+| `['susu', groupId]` | GET `/api/susu/:id/` | 30 sec |
+| `['susu', groupId, 'contributions']` | GET `/api/susu/:id/contributions/` | 30 sec |
+| `['susu', groupId, 'members']` | GET `/api/susu/:id/members/` | 5 min |
+| `['activity']` | GET `/api/activity/` | 1 min |
 
-### Savings Queries
-
-| Query Key | Endpoint | Stale Time |
-|-----------|----------|------------|
-| `['savings']` | GET `/api/savings/` | 2 min |
-| `['savings', pocketId]` | GET `/api/savings/:id/` | 2 min |
-
-### Notification Queries
-
-| Query Key | Endpoint | Stale Time |
-|-----------|----------|------------|
-| `['notifications']` | GET `/api/notifications/` | 5 min |
-| `['notifications', 'unread']` | GET `/api/notifications/?unread=true` | 1 min |
+**Round state must never be cached long.** A stale rotation means a member is told the wrong person
+is collecting. `staleTime` of 30 seconds on group detail is a product decision, not a performance one.
 
 ## Mutation Definitions
 
-### Auth Mutations
+### Auth
 
 ```javascript
-// mutations/auth.js
-const useLoginMutation = useMutation({
-  mutationFn: (credentials) => axios.post('/api/auth/login/', credentials),
-  onSuccess: (data) => {
-    useAuthStore.getState().login(data.user, data.token);
-  },
-  onError: (error) => {
-    // Show error message (not optimistic — wait for server)
-  },
+export const useLoginMutation = useMutation({
+  mutationFn: (credentials) => api.post('/api/auth/login/', credentials).then((r) => r.data),
+  onSuccess: (data) => useAuthStore.getState().login(data.user, data.token),
 });
 
-const useLogoutMutation = useMutation({
-  mutationFn: () => axios.post('/api/auth/logout/'),
+export const useLogoutMutation = useMutation({
+  mutationFn: () => api.post('/api/auth/logout/'),
   onSuccess: () => {
     useAuthStore.getState().logout();
     queryClient.clear();
-    useTransactionQueueStore.getState().setPendingTransactions([]);
-  },
-});
-
-const useCreateAccountMutation = useMutation({
-  mutationFn: (data) => axios.post('/api/auth/register/', data),
-  onSuccess: (data) => {
-    useAuthStore.getState().login(data.user, data.token);
+    useOfflineQueueStore.getState().clear();
   },
 });
 ```
 
-### Payment Mutations (with optimistic updates)
+### Susu
 
 ```javascript
-// mutations/payments.js
-const useSendMoneyMutation = useMutation({
-  mutationFn: (data) => axios.post('/api/payments/send/', data),
+export const useContributeMutation = useMutation({
+  mutationFn: ({ groupId, ...data }) =>
+    api
+      .post(`/api/susu/${groupId}/contributions/`, data, {
+        headers: { 'X-Idempotency-Key': data.idempotencyKey },
+      })
+      .then((r) => r.data),
   onMutate: async (newData) => {
-    // Cancel outgoing refetches
-    await queryClient.cancelQueries(['transactions']);
-    // Snapshot previous balance
-    const previousBalance = queryClient.getQueryData(['balance']);
-    // Optimistically update balance
-    queryClient.setQueryData(['balance'], (old) => ({
+    await queryClient.cancelQueries(['susu', newData.groupId]);
+    const prev = queryClient.getQueryData(['susu', newData.groupId]);
+    // Optimistic: show immediately as PENDING — never as verified
+    queryClient.setQueryData(['susu', newData.groupId], (old) => ({
       ...old,
-      amount: old.amount - newData.amount,
-    }));
-    // Add to pending transactions (offline support)
-    useTransactionQueueStore.getState().addTransaction({
-      id: `tx-${Date.now()}`,
-      type: 'send',
-      data: newData,
-    });
-    return { previousBalance };
-  },
-  onError: (err, variables, context) => {
-    // Rollback on failure
-    queryClient.setQueryData(['balance'], context.previousBalance);
-    // Keep in queue for retry
-  },
-  onSettled: () => {
-    queryClient.invalidateQueries(['transactions']);
-    queryClient.invalidateQueries(['balance']);
-    // Remove from transaction queue
-  },
-});
-
-const useRequestMoneyMutation = useMutation({
-  mutationFn: (data) => axios.post('/api/payments/request/', data),
-  onMutate: async (newData) => {
-    await queryClient.cancelQueries(['transactions']);
-    const previousBalance = queryClient.getQueryData(['balance']);
-    queryClient.setQueryData(['balance'], (old) => ({
-      ...old,
-      amount: old.amount + newData.amount,
-    }));
-    return { previousBalance };
-  },
-  onError: (err, variables, context) => {
-    queryClient.setQueryData(['balance'], context.previousBalance);
-  },
-  onSettled: () => {
-    queryClient.invalidateQueries(['transactions']);
-    queryClient.invalidateQueries(['balance']);
-  },
-});
-```
-
-### Susu Mutations
-
-```javascript
-const useSusuContributeMutation = useMutation({
-  mutationFn: (data) => axios.post(`/api/susu/${data.susuId}/contributions/`, data),
-  onMutate: async (newData) => {
-    await queryClient.cancelQueries(['susu', newData.susuId]);
-    const prev = queryClient.getQueryData(['susu', newData.susuId]);
-    // Optimistically: add contribution to member's total
-    queryClient.setQueryData(['susu', newData.susuId], (old) => ({
-      ...old,
-      contributions: [...old.contributions, { ...newData, verified: false }],
+      contributions: [
+        ...(old?.contributions ?? []),
+        { ...newData, status: 'pending', pendingSync: true },
+      ],
     }));
     return { prev };
   },
   onError: (err, variables, context) => {
-    queryClient.setQueryData(['susu', variables.susuId], context.prev);
+    queryClient.setQueryData(['susu', variables.groupId], context.prev);
   },
-  onSettled: () => {
-    queryClient.invalidateQueries(['susu', variables.susuId]);
+  onSettled: (data, error, variables) => {
+    queryClient.invalidateQueries(['susu', variables.groupId]);
+    queryClient.invalidateQueries(['susu']);
+    queryClient.invalidateQueries(['activity']);
+  },
+});
+```
+
+**Critical rule: optimistic updates may set status to `pending`, never `verified`.** Verification is
+server-side and payment-rail-backed. Showing a contribution as verified before the server confirms
+it defeats the entire product promise.
+
+```javascript
+export const useVerifyMutation = useMutation({
+  mutationFn: ({ groupId, contributionId }) =>
+    api.post(`/api/susu/${groupId}/contributions/${contributionId}/verify/`).then((r) => r.data),
+  onSuccess: () => {
+    queryClient.invalidateQueries(['susu']);
+    queryClient.invalidateQueries(['activity']);
+  },
+});
+
+export const useFlagMutation = useMutation({
+  mutationFn: ({ groupId, contributionId }) =>
+    api.post(`/api/susu/${groupId}/contributions/${contributionId}/flag/`).then((r) => r.data),
+  onSuccess: () => {
+    queryClient.invalidateQueries(['susu']);
+    queryClient.invalidateQueries(['activity']);
+  },
+});
+
+export const usePayoutMutation = useMutation({
+  mutationFn: ({ groupId }) => api.post(`/api/susu/${groupId}/payout/`).then((r) => r.data),
+  onSuccess: () => {
+    queryClient.invalidateQueries(['susu']);
+    queryClient.invalidateQueries(['activity']);
+  },
+});
+
+export const useJoinGroupMutation = useMutation({
+  mutationFn: ({ inviteCode, name, phone }) =>
+    api.post('/api/susu/join/', { inviteCode, name, phone }).then((r) => r.data),
+  onSuccess: () => {
+    queryClient.invalidateQueries(['susu']);
   },
 });
 ```
@@ -389,220 +310,165 @@ const useSusuContributeMutation = useMutation({
 ## Query Hooks
 
 ```javascript
+// hooks/useSusuQueries.js
+export const useSusuGroups = () =>
+  useQuery({ queryKey: ['susu'], queryFn: () => api.get('/api/susu/').then((r) => r.data) });
+
+export const useSusuGroup = (groupId) =>
+  useQuery({
+    queryKey: ['susu', groupId],
+    queryFn: () => api.get(`/api/susu/${groupId}/`).then((r) => r.data),
+    enabled: !!groupId,
+    refetchInterval: 30000, // keep round state fresh
+  });
+
+export const useSusuContributions = (groupId) =>
+  useQuery({
+    queryKey: ['susu', groupId, 'contributions'],
+    queryFn: () => api.get(`/api/susu/${groupId}/contributions/`).then((r) => r.data),
+    enabled: !!groupId,
+  });
+
+export const useActivity = (filter) =>
+  useQuery({
+    queryKey: ['activity', filter],
+    queryFn: () => api.get('/api/activity/', { params: { filter } }).then((r) => r.data),
+  });
+
 // hooks/useAuthQueries.js
-export const useAuthMe = () => useQuery({
-  queryKey: ['auth', 'me'],
-  queryFn: () => api.get('/api/auth/me').then(r => r.data),
-  enabled: useAuthStore.getState().isAuthenticated,
-});
-
-// hooks/useBalanceQueries.js
-export const useBalance = () => useQuery({
-  queryKey: ['balance'],
-  queryFn: () => api.get('/api/balance/').then(r => r.data),
-});
-
-// hooks/useGroupQueries.js
-export const useGroups = () => useQuery({
-  queryKey: ['groups'],
-  queryFn: () => api.get('/api/groups/').then(r => r.data),
-});
-
-export const useGroup = (groupId) => useQuery({
-  queryKey: ['group', groupId],
-  queryFn: () => api.get(`/api/groups/${groupId}/`).then(r => r.data),
-  enabled: !!groupId,
-});
-
-export const useGroupMembers = (groupId) => useQuery({
-  queryKey: ['group', groupId, 'members'],
-  queryFn: () => api.get(`/api/groups/${groupId}/members/`).then(r => r.data),
-  enabled: !!groupId,
-});
-
-// hooks/usePaymentMutations.js
-export const useSendMoney = () => useMutation({
-  mutationFn: (data) => api.post('/api/payments/send/', data),
-  // ... (onMutate, onError, onSettled as defined above)
-});
-
-export const useRequestMoney = () => useMutation({
-  mutationFn: (data) => api.post('/api/payments/request/', data),
-});
-
-// hooks/useSusuMutations.js
-export const useSusuContribute = (susuId) => useMutation({
-  mutationFn: (data) => api.post(`/api/susu/${susuId}/contributions/`, data),
-});
-
-export const useSusuPayout = (susuId) => useMutation({
-  mutationFn: () => api.post(`/api/susu/${susuId}/payout/`),
-  onSuccess: () => {
-    queryClient.invalidateQueries(['susu', susuId]);
-    queryClient.invalidateQueries(['susu']);
-  },
-});
-
-// hooks/useSavingsMutations.js
-export const useCreatePocket = () => useMutation({
-  mutationFn: (data) => api.post('/api/savings/', data),
-});
-
-export const usePocketTransfer = (pocketId) => useMutation({
-  mutationFn: ({ type, amount }) =>
-    api.post(`/api/savings/${pocketId}/transfer/`, { type, amount }),
-});
-
-// hooks/useNotificationMutations.js
-export const useMarkRead = (id) => useMutation({
-  mutationFn: () => api.patch(`/api/notifications/${id}/`, { read: true }),
-  onSuccess: () => { queryClient.invalidateQueries(['notifications']); },
-});
+export const useAuthMe = () =>
+  useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get('/api/auth/me').then((r) => r.data),
+    enabled: useAuthStore.getState().isAuthenticated,
+  });
 ```
 
-## Offline Queue Worker
+## Offline Sync Worker
 
 ```javascript
 // lib/offlineWorker.js
 import NetInfo from '@react-native-community/netinfo';
-import { useTransactionQueueStore } from '../stores/transactionQueueStore';
-import { queryClient } from '../lib/queryClient';
+import { useOfflineQueueStore } from '../stores/offlineQueueStore';
+import { queryClient } from './queryClient';
 import api from './api';
 
-// Map transaction types to actual API calls
-const retryMutation = async (type, data) => {
+const send = (item) => {
+  const { groupId, type, payload, id } = item;
+  const base = { headers: { 'X-Idempotency-Key': id } };
   switch (type) {
-    case 'send':
-      return api.post('/api/payments/send/', data);
-    case 'request':
-      return api.post('/api/payments/request/', data);
-    case 'susu-contribute':
-      return api.post(`/api/susu/${data.susuId}/contributions/`, data);
-    case 'savings-transfer':
-      return api.post(`/api/savings/${data.pocketId}/transfer/`, data);
+    case 'contribution':
+      return api.post(`/api/susu/${groupId}/contributions/`, payload, base);
+    case 'verify':
+      return api.post(`/api/susu/${groupId}/contributions/${payload.contributionId}/verify/`);
+    case 'flag':
+      return api.post(`/api/susu/${groupId}/contributions/${payload.contributionId}/flag/`);
     default:
-      throw new Error(`Unknown transaction type: ${type}`);
+      throw new Error(`Unknown queue type: ${type}`);
   }
 };
 
-const retryQueue = async () => {
-  const pending = useTransactionQueueStore.getState().pendingTransactions;
-  for (const tx of pending) {
-    if (tx.retries >= 3) continue; // Max retries reached
+export const retryQueue = async () => {
+  const queue = useOfflineQueueStore.getState().queue;
+  // Oldest first, so a member's contributions replay in the order they were made
+  for (const item of queue) {
+    if (item.retries >= 5) continue;
     try {
-      await retryMutation(tx.type, tx.data);
-      useTransactionQueueStore.getState().removeTransaction(tx.id);
-      queryClient.invalidateQueries(['balance']);
-      queryClient.invalidateQueries(['transactions']);
-    } catch (error) {
-      useTransactionQueueStore.getState().incrementRetry(tx.id);
+      await send(item);
+      useOfflineQueueStore.getState().markSynced(item.id);
+    } catch {
+      useOfflineQueueStore.getState().incrementRetry(item.id);
     }
   }
+  queryClient.invalidateQueries({ queryKey: ['susu'] });
+  queryClient.invalidateQueries({ queryKey: ['activity'] });
 };
 
-const startOfflineWorker = () => {
-  NetInfo.fetch().then((state) => {
-    if (state.isConnected) retryQueue();
-  });
-
-  const unsubscribe = NetInfo.addEventListener((state) => {
-    if (state.isConnected) retryQueue();
-  });
-
-  return unsubscribe;
+export const startOfflineWorker = () => {
+  NetInfo.fetch().then((s) => s.isConnected && retryQueue());
+  return NetInfo.addEventListener((s) => s.isConnected && retryQueue());
 };
 ```
+
+**Payouts are never queued.** A payout moves real money and is gated on server-side verification.
+It must never fire from a stale offline client.
 
 ## State Flow Diagram
 
 ```
-User Action (e.g., Send Money)
-  → React Component
-    → Zustand Store (UI state update: loading = true)
-      → TanStack Query Mutation (API call)
-        → onMutate: Optimistic balance update + offline queue
-        → API Response
-          → onSuccess: Clear offline queue, invalidate queries
-          → onError: Rollback balance, keep in queue
-        → onSettled: Refresh balance + transactions queries
-          → Components re-render with fresh data
+Member taps "Log contribution"
+  → BottomSheet opens
+    → Optimistic insert as PENDING (never VERIFIED)
+      → Offline queue enqueue (idempotency key generated)
+        → Network available?
+          ├── No  → stays queued, UI shows "Saved offline"
+          └── Yes → POST /contributions/
+                → Rail verifies the reference server-side
+                  → pending → verified | failed
+                    → invalidate ['susu', groupId] + ['activity']
+                      → all contributions verified?
+                        → Yes → payout becomes eligible
 ```
 
 ## Cross-Component State Access
 
 | Component | Reads | Writes |
 |-----------|-------|--------|
-| HomeScreen | `['balance']`, `['activity']`, `['notifications']` | — |
-| Notifications | `['notifications']` | `['notification', id]` (mark read) |
-| Profile | `useAuthStore` (user), `useUIStore` (theme) | `useAuthStore` (update user) |
-| Login | — | `useAuthStore` (login) |
-| Susu Detail | `['susu', id]`, `['susu', id, 'contributions']` | `useSusuContributeMutation` |
-| Savings Detail | `['savings', id]` | `['savings', id]` (transfer mutation) |
-| Group Detail | `['group', id]`, `['group', id, 'members']` | — |
-| USSD Progress | `useUSSDStore` (activeSession) | `useUSSDStore` (updateSession) |
+| Susu Home | `['susu']` | `useJoinGroupMutation` |
+| Susu Detail | `['susu', id]`, `['susu', id, 'contributions']` | `useContributeMutation`, `useVerifyMutation`, `useFlagMutation`, `usePayoutMutation` |
+| Activity | `['activity', filter]` | — |
+| Login / Create Account | — | `useLoginMutation`, `useCreateAccountMutation` |
+| Account | `useAuthStore` | `useLogoutMutation` |
 
 ## Implementation Task List
 
-1. **Install dependencies** — `@tanstack/react-query`, `zustand`, `expo-secure-store`, `@react-native-community/netinfo`, `axios`
-2. **Create `lib/api.js`** — Axios instance with token interceptor, 401 handler
-3. **Create `lib/queryClient.js`** — QueryClient configuration with stale times, retry logic
-4. **Create `lib/offlineWorker.js`** — Retry queue, `retryMutation`, NetInfo listener
-5. **Create `lib/tokenRefresh.js`** — Token refresh interceptor, request queuing
-6. **Create `stores/authStore.js`** — Auth Zustand store with SecureStore persist
-7. **Create `stores/uiStore.js`** — Theme, currency, active tab Zustand store
-8. **Create `stores/ussdStore.js`** — USSD session Zustand store
-9. **Create `stores/transactionQueueStore.js`** — Offline transaction queue Zustand store
-10. **Create `hooks/useAuthQueries.js`** — Auth query hooks (`useAuthMe`)
-11. **Create `hooks/useBalanceQueries.js`** — Balance query hooks
-12. **Create `hooks/useGroupQueries.js`** — Group query hooks (list, detail, members, balances)
-13. **Create `hooks/usePaymentMutations.js`** — Send, request mutations with optimistic updates
-14. **Create `hooks/useSusuMutations.js`** — Susu contribution, payout mutations
-15. **Create `hooks/useSavingsMutations.js`** — Create pocket, pocket transfer mutations
-16. **Create `hooks/useNotificationMutations.js`** — Mark read mutation
-17. **Integrate QueryClientProvider** in `index.js` or `App.jsx`
-18. **Integrate Zustand stores** in app entry point
-19. **Wire offline worker** in app entry point
-20. **Test auth flow** with persisted session across app restart
-21. **Test offline mode** — Queue transactions, reconnect, verify sync
-22. **Test optimistic updates** — Verify rollback on failure
-
-## Dev Tools
-
-- React Query DevTools: `<ReactQueryDevtools initialIsOpen={false} />`
-- Zustand DevTools: `devtools` middleware on stores
-
-## Open Questions
-
-1. **Query keys for USSD data** — Should USSD data use TanStack Query (cached) or Zustand only (ephemeral)? Since USSD sessions expire in 30s, Zustand-only makes sense.
-2. **Push notification payload** — When FCM triggers, does it carry enough data to determine which query to invalidate? (e.g., `{ type: 'susu-payout', susuId: 5 }`)
-3. **Transaction queue conflict** — What if user makes a payment while offline, then reconnects WHILE another payment is in-flight? Need locking mechanism.
+1. Install `@tanstack/react-query`, `axios`, `expo-secure-store`, `@react-native-community/netinfo`
+2. `lib/api.js` — Axios instance, auth interceptor, idempotency header, 401 handler
+3. `lib/queryClient.js` — QueryClient with the stale times above
+4. `lib/offlineWorker.js` — retry queue, NetInfo listener, ordered replay
+5. `lib/tokenRefresh.js` — token refresh with request queueing
+6. `stores/authStore.js` — SecureStore-backed auth
+7. `stores/uiStore.js` — theme, active tab
+8. `stores/offlineQueueStore.js` — the offline queue
+9. `hooks/useAuthQueries.js`, `hooks/useSusuQueries.js`
+10. `hooks/useSusuMutations.js` — contribute, verify, flag, payout, join
+11. `QueryClientProvider` + store wiring + offline worker in the app entry point
+12. **Backend**: idempotency key handling on `POST /contributions/` (unique constraint)
+13. **Backend**: `SusuGroup`, `SusuMember`, `SusuContribution`, `SusuRound` + JWT auth
+14. Replace the `CURRENT_USER_ID` stub with real session state
+15. Test: auth persists across app restart
+16. Test: contribution queued offline, syncs on reconnect, creates exactly one row
+17. Test: optimistic insert shows `pending`, then reconciles to `verified`
+18. Test: stale cache never shows the wrong current receiver
 
 ## Security Considerations
 
-- Auth token stored in SecureStore (encrypted), NOT AsyncStorage
-- Zustand persist uses AsyncStorage for non-sensitive data (theme, currency)
-- JWT token excluded from Zustand persist (stored separately in SecureStore)
-- All API requests include `Authorization: Bearer ${token}` from SecureStore
-- Axios 401 interceptor clears auth and redirects to login
-- All amounts validated server-side (never trust client-calculated values)
+- Auth token in **SecureStore only** — never in the AsyncStorage persist payload
+- **All amounts validated server-side.** Never trust client-calculated shares.
+- Payout requires server-side confirmation that every contribution is verified
+- `select_for_update()` on round state to prevent double payouts
+- Idempotency keys on every contribution write
+- Act 843: register as data controller, appoint a DPO, encrypt in transit and at rest
 
 ## Testing Strategy
 
-### Zustand Stores
-- Test auth store: login, logout, updateUser
-- Test UI store: theme toggle, currency change
-- Test USSD store: session set/update/clear
-- Test transaction queue: add, remove, increment retry
+### Zustand stores
+- Auth: login, logout, rehydrate from SecureStore
+- Offline queue: enqueue, markSynced, incrementRetry, clear
+- **Queue ordering is oldest-first**
 
 ### TanStack Query
-- Mock API responses, test query caching behavior
-- Test mutation optimistic update + rollback
-- Test query invalidation triggers
-- Test offline queue retry logic
+- Optimistic insert renders `pending` immediately
+- Rollback restores previous state on error
+- Invalidation refetches group detail and activity
+- **Group detail refetches on focus so the current receiver is never stale**
+
+### Offline
+- Contribute with no network → queued, UI shows saved offline
+- Reconnect → syncs in order, exactly one contribution created
+- Replay of an already-applied item is a no-op (idempotency)
 
 ### Integration
-- Test state sync across components (e.g., balance updates on HomeScreen after payment)
-- Test auth state persistence across app restart
-- Test offline mode: queue transactions, reconnect, verify sync
-- Test token refresh flow (401 → queue → refresh → replay)
-- Test logout clears all caches AND transaction queue
+- Round advances on confirmed payout; `currentTurnIndex` rotates
+- Missing contributions do not block the member's own logged contribution
+- Admin flagging a contribution blocks the round until resolved

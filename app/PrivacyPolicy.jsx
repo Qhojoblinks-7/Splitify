@@ -1,23 +1,24 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { ChevronLeft, Shield, FileText, Database, Share2, Cookie, Clock, UserCheck, Lock, RefreshCw, Mail } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { openEmail as openMailClient } from "../utils/openEmail";
 
-const contactEmail = "privacy@splitify.com";
+const contactEmail = "privacy@growl.app";
 
 const sections = [
   {
     id: "introduction",
     title: "Introduction",
     icon: Shield,
-    text: "Splitify (Splitify Technologies Inc.) respects your privacy and is committed to protecting the personal information you share with us. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application and services.",
+    text: "Growl (Growl Technologies Ltd.) respects your privacy and is committed to protecting the personal information you share with us. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application and services.",
   },
   {
     id: "collection",
     title: "Information We Collect",
     icon: Database,
-    text: "We collect information you provide directly to us, such as when you create an account, add friends, create or join groups, record expenses, or contact us. This may include your name, email address, phone number, profile photo, and payment information. We also collect information automatically, including your device type, operating system, and usage data.",
+    text: "We collect information you provide directly to us, such as when you create an account, join or create a susu group, add members, log a contribution, or contact us. This may include your name, email address, phone number, mobile money number, and contribution references. We also collect information automatically, including your device type, operating system, and usage data.",
   },
   {
     id: "use",
@@ -67,11 +68,7 @@ export default function PrivacyPolicy() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const openEmail = () => {
-    Linking.openURL(`mailto:${contactEmail}`).catch(() => {
-      Alert.alert("Unable to open email", "Please open your email app manually.");
-    });
-  };
+  const openEmail = () => openMailClient(contactEmail);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -102,7 +99,7 @@ export default function PrivacyPolicy() {
         <View style={styles.introCard}>
           <Text style={styles.introTitle}>Please read carefully</Text>
           <Text style={styles.introText}>
-            This policy explains what information Splitify collects, how we use it, and your rights. It applies to all users of the app.
+            This policy explains what information Growl collects, how we use it, and your rights. It applies to all users of the app.
           </Text>
         </View>
 

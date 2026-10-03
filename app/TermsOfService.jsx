@@ -1,15 +1,18 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { ChevronLeft, ScrollText, ShieldCheck, CreditCard, AlertTriangle, RefreshCw, LogOut, Mail } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { openEmail } from "../utils/openEmail";
+
+const supportEmail = "support@growl.app";
 
 const sections = [
   {
     id: "acceptance",
     title: "Acceptance Of Terms",
     icon: ScrollText,
-    text: "By creating an account or using Splitify, you agree to these Terms of Service. If you do not agree, do not use the app.",
+    text: "By creating an account or using Growl, you agree to these Terms of Service. If you do not agree, do not use the app.",
   },
   {
     id: "account",
@@ -19,15 +22,15 @@ const sections = [
   },
   {
     id: "payments",
-    title: "Payments And Bills",
+    title: "Contributions And Payouts",
     icon: CreditCard,
-    text: "You are responsible for the bills, requests, and payment details you add to Splitify. Payment availability and processing times may depend on your payment provider.",
+    text: "Contributions are recorded against the mobile money reference you provide. A pot is only released once every contribution for that round is verified, and amounts and processing times depend on your mobile money provider.",
   },
   {
     id: "conduct",
     title: "Acceptable Use",
     icon: AlertTriangle,
-    text: "Do not use Splitify for unlawful activity, fraudulent requests, harassment, or anything that could harm other users or the service.",
+    text: "Do not use Growl for unlawful activity, fraudulent requests, harassment, or anything that could harm other users or the service.",
   },
   {
     id: "changes",
@@ -39,7 +42,7 @@ const sections = [
     id: "termination",
     title: "Account Termination",
     icon: LogOut,
-    text: "We may suspend or terminate access when necessary to protect the service, users, or comply with legal requirements. You may stop using Splitify at any time.",
+    text: "We may suspend or terminate access when necessary to protect the service, users, or comply with legal requirements. You may stop using Growl at any time.",
   },
 ];
 
@@ -47,11 +50,7 @@ export default function TermsOfService() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const openEmail = () => {
-    Linking.openURL("mailto:support@splitify.com").catch(() => {
-      Alert.alert("Unable to open email", "Please open your email app manually.");
-    });
-  };
+  const openSupportEmail = () => openEmail(supportEmail);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -76,7 +75,7 @@ export default function TermsOfService() {
         <View style={styles.introCard}>
           <Text style={styles.introTitle}>Please read carefully</Text>
           <Text style={styles.introText}>
-            These terms describe your relationship with Splitify and explain how the service
+            These terms describe your relationship with Growl and explain how the service
             may be used.
           </Text>
         </View>
@@ -101,7 +100,7 @@ export default function TermsOfService() {
 
         <TouchableOpacity
           style={styles.contactButton}
-          onPress={openEmail}
+          onPress={openSupportEmail}
           accessibilityRole="button"
           accessibilityLabel="Contact support about terms"
         >

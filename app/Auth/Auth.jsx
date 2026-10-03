@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { Text, View, Image, StyleSheet } from 'react-native';
+import { Text, View, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import GoogleIcon from '../../assets/images/google.svg';
-import AppleIcon from '../../assets/images/Apple.png'
 import BaseButton from '../../components/atoms/BaseButton';
 
 export default function Auth() {
-  const [loadingStatus, setLoadingStatus] = useState('Please wait!...');
     const router = useRouter();
 
   const onPressGoogle = () => {
@@ -30,11 +28,9 @@ export default function Auth() {
   return (
     <View style={styles.container}>
 
-      {/* App Logo Asset Space */}
-      <Image 
-        source={require('../../assets/images/logo.png')} // Replace with your actual local project asset path
-        style={styles.logoImage} 
-      />
+      {/* Brand wordmark */}
+      <Text style={styles.brand}>Growl</Text>
+      <Text style={styles.tagline}>Grow Your Wealth Together</Text>
 
       <Text style={styles.title}>Let's Get Started</Text>
 
@@ -83,9 +79,11 @@ export default function Auth() {
       </View>
 
       <View style={{  }} />
-      <Text style={{ color: '#666666', fontSize: 12, marginTop: 50 }}>
-        Privacy Policy | Terms of Service
-      </Text>
+      <TouchableOpacity onPress={() => router.push("/PrivacyPolicy")}>
+        <Text style={{ color: '#666666', fontSize: 12, marginTop: 50 }}>
+          Privacy Policy | Terms of Service
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -96,13 +94,25 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#16171b', // Sleek splitify dark canvas background
+    backgroundColor: '#16171b', // Sleek Growl dark canvas background
   },
   logoImage: {
     width: 200,
     height: 100,
     borderRadius: 20,
     marginBottom: 32,
+  },
+  brand: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -1,
+  },
+  tagline: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fbb81c',
+    marginBottom: 28,
   },
   socialIcon: {
     width: 50,

@@ -7,33 +7,109 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Svg, Path } from "react-native-svg";
+import { ShieldCheck, CloudOff, Users, TrendingUp } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import NextButton from "../components/atoms/NextButton";
 import SkipButton from "../components/atoms/SkipButton";
 
+const ROSTER = [
+  { name: "Ama", color: "#4ade80" },
+  { name: "Kofi", color: "#3b82f6" },
+  { name: "You", color: "#fbb81c" },
+  { name: "Efua", color: "#ec4899" },
+];
+
 const ONBOARDING_DATA = [
   {
     id: "1",
-    title: "Seamless Payments, Effortless Splits", // Fixed typo here
+    title: "Save Together, Grow Together",
     description:
-      "With Splitify, you can easily split bills and expenses with friends, family, or roommates. No more awkward calculations or forgotten payments!",
-    color: "#e74c3c",
+      "Growl turns your usual group susu into a digital one. Everyone contributes the same amount each week, and each member takes the full pot in turn.",
+    color: "#fbb81c",
+    visual: "pot",
   },
   {
     id: "2",
-    title: "Share Bills, Share Moments",
+    title: "Whose Turn Is Clear",
     description:
-      "Splitify not only simplifies bill splitting but also helps you create shared expenses for trips, dinners, or any group activity. Keep track of who owes what and settle up with ease.",
-    color: "#2ecc71",
+      "Your week in the rotation is fixed. Growl always shows who is collecting next, how much is still needed, and when the pot is full and ready to be paid out.",
+    color: "#4ade80",
+    visual: "rotation",
   },
   {
     id: "3",
-    title: "Stay Connected, Split Confidently",
+    title: "Every Cedi Verified",
     description:
-      "Splitify keeps you connected with your group, sending reminders and notifications to ensure everyone stays on top of their payments. Say goodbye to awkward conversations about money and hello to hassle-free splitting!",
-    color: "#3498db",
+      "Each contribution is checked against your mobile money reference before the pot moves. Everyone can see who paid, and when. No more arguing over the book.",
+    color: "#3b82f6",
+    visual: "verified",
+  },
+  {
+    id: "4",
+    title: "It Works Without Signal",
+    description:
+      "In the market with no network, log your contribution anyway. It is saved on your phone and verified the moment you are back online. Growl never holds your money.",
+    color: "#a855f7",
+    visual: "offline",
   },
 ];
+
+/**
+ * Illustrative panels for the carousel. These are deliberately not image files:
+ * a real rotation diagram teaches the concept faster than a stock screenshot,
+ * and it stays crisp at any screen size.
+ */
+function OnboardingVisual({ kind, color, size }) {
+  if (kind === "rotation") {
+    return (
+      <View style={[styles.visualCircle, { borderColor: color, width: size, height: size, borderRadius: size / 2 }]}>
+        {ROSTER.map((person, index) => {
+          const angle = (index / ROSTER.length) * Math.PI * 2 - Math.PI / 2;
+          const radius = size / 2 - 26;
+          const cx = size / 2 + radius * Math.cos(angle);
+          const cy = size / 2 + radius * Math.sin(angle);
+          const isYou = person.name === "You";
+          return (
+            <View
+              key={person.name}
+              style={[
+                styles.rotationNode,
+                {
+                  left: cx - 19,
+                  top: cy - 19,
+                  backgroundColor: person.color,
+                  borderColor: isYou ? "#ffffff" : "transparent",
+                  borderWidth: isYou ? 2 : 0,
+                },
+              ]}
+            >
+              <Text style={styles.rotationInitial}>{person.name.charAt(0)}</Text>
+            </View>
+          );
+        })}
+        <View style={styles.rotationCenter}>
+          <TrendingUp size={22} color="#ffffff" />
+        </View>
+      </View>
+    );
+  }
+
+  const Icon = kind === "verified" ? ShieldCheck : kind === "offline" ? CloudOff : Users;
+  const caption = kind === "verified" ? "MP260114.0932" : kind === "offline" ? "Saved offline" : "4 members";
+
+  return (
+    <View style={styles.visualCard}>
+      <View style={[styles.visualIcon, { backgroundColor: color }]}>
+        <Icon size={30} color="#16171b" />
+      </View>
+      <View style={styles.visualLines}>
+        <View style={[styles.visualLine, { width: "70%", backgroundColor: color }]} />
+        <View style={[styles.visualLine, { width: "45%", backgroundColor: "#4b4b52" }]} />
+      </View>
+      <Text style={[styles.visualCaption, kind !== "verified" && { color: color }]}>{caption}</Text>
+    </View>
+  );
+}
 
 export default function Onboarding() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -62,7 +138,7 @@ export default function Onboarding() {
   const isLastSlide = currentIndex === ONBOARDING_DATA.length - 1;
   const currentSlideData = ONBOARDING_DATA[currentIndex];
 
-  const curveHeight = 60; 
+  const curveHeight = 60;
   const pathData = `
         M 0 ${curveHeight}
         Q ${width / 2} 0 ${width} ${curveHeight}
@@ -70,6 +146,8 @@ export default function Onboarding() {
         L 0 ${curveHeight}
         Z
     `;
+
+  const visualSize = Math.min(width - 120, 250);
 
   return (
     <View style={styles.container}>
@@ -85,7 +163,7 @@ export default function Onboarding() {
           viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
           renderItem={({ item }) => (
             <View style={[styles.imageSlide, { width }]}>
-              <View style={[styles.imagePlaceholder, { backgroundColor: item.color }]} />
+              <OnboardingVisual kind={item.visual} color={item.color} size={visualSize} />
             </View>
           )}
           keyExtractor={(item) => item.id}
@@ -113,7 +191,7 @@ export default function Onboarding() {
                 style={[
                   styles.indicator,
                   {
-                    backgroundColor: index === currentIndex ? "#ffcc00" : "#464646",
+                    backgroundColor: index === currentIndex ? "#fbb81c" : "#464646",
                     width: index === currentIndex ? 24 : 8,
                   },
                 ]}
@@ -137,7 +215,7 @@ export default function Onboarding() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffcc00", // Using your premium yellow canvas background
+    backgroundColor: "#fbb81c",
   },
   carouselZone: {
     flex: 1, // Balanced 50/50 split with the bottom wrapper
@@ -148,10 +226,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  imagePlaceholder: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+  visualCircle: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
+  rotationNode: {
+    position: "absolute",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rotationInitial: { color: "#16171b", fontSize: 14, fontWeight: "800" },
+  rotationCenter: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#1e1f24",
+    borderWidth: 1,
+    borderColor: "#2a2b30",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  visualCard: {
+    width: 250,
+    backgroundColor: "#1e1f24",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#2a2b30",
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  visualIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  visualLines: { flex: 1, gap: 8 },
+  visualLine: { height: 10, borderRadius: 5 },
+  visualCaption: {
+    position: "absolute",
+    bottom: -26,
+    alignSelf: "center",
+    color: "#8e8e93",
+    fontSize: 12,
+    fontWeight: "700",
   },
   bottomSheetWrapper: {
     flex: 1, // Balanced 50/50 split, giving the sheet plenty of room to expand safely

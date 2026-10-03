@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#222327",
   },
   focusedInputContainer: {
-    borderColor: "#fbb81c", // Instantly lights up with Splitify's signature gold color when active!
+    borderColor: "#fbb81c", // Signature gold border when the field is focused
   },
   textInput: {
     flex: 1,

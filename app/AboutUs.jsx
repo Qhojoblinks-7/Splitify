@@ -1,26 +1,29 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { ChevronLeft, Info, Users, ShieldCheck, Heart, Globe, Mail } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { openEmail } from "../utils/openEmail";
+
+const supportEmail = "support@growl.app";
 
 const values = [
   {
     id: "simple",
     title: "Simple",
-    text: "Split bills and track balances without complicated steps.",
+    text: "Start a susu group and start collecting in minutes, with no paper records.",
     icon: Heart,
   },
   {
     id: "transparent",
     title: "Transparent",
-    text: "Keep every amount, request, and payment easy to understand.",
+    text: "Every contribution, reference, and payout stays visible to the whole group.",
     icon: Info,
   },
   {
     id: "secure",
     title: "Secure",
-    text: "Protect account activity with thoughtful security controls.",
+    text: "Verified mobile money references before any pot is released.",
     icon: ShieldCheck,
   },
 ];
@@ -29,11 +32,7 @@ export default function AboutUs() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const openEmail = () => {
-    Linking.openURL("mailto:support@splitify.com").catch(() => {
-      Alert.alert("Unable to open email", "Please open your email app manually.");
-    });
-  };
+  const openSupportEmail = () => openEmail(supportEmail);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -52,15 +51,15 @@ export default function AboutUs() {
           <View style={styles.headerIcon}>
             <Info size={30} color="#16171b" />
           </View>
-          <Text style={styles.title}>About Splitify</Text>
+          <Text style={styles.title}>About Growl</Text>
         </View>
 
         <View style={styles.missionCard}>
           <Text style={styles.missionTitle}>Our mission</Text>
           <Text style={styles.missionText}>
-            Splitify helps friends, roommates, teams, and families share expenses confidently.
-            We make it easy to create groups, split bills, request money, and stay informed
-            without losing track of who paid or who still owes.
+            Growl helps market associations, family circles, colleagues, and youth groups save
+            together with confidence. We make it easy to start a susu group, collect weekly
+            contributions, and pay the full pot to each member in turn.
           </Text>
         </View>
 
@@ -85,11 +84,11 @@ export default function AboutUs() {
 
         <View style={styles.storyCard}>
           <Users size={24} color="#fbb81c" style={styles.storyIcon} />
-          <Text style={styles.storyTitle}>Built around real conversations</Text>
+          <Text style={styles.storyTitle}>Built for real savings circles</Text>
           <Text style={styles.storyText}>
-            Splitify was created to remove awkward money conversations from everyday life.
-            Our goal is to give everyone a clear view of shared costs while keeping the
-            experience friendly and approachable.
+            Growl was created to take group susu out of the notebook and into the app, where the
+            rotation, the pot, and every cedi contributed can be seen by everyone at once.
+            Our goal is simple: grow your wealth together.
           </Text>
         </View>
 
@@ -99,7 +98,7 @@ export default function AboutUs() {
             <Text style={styles.contactTitle}>Questions or ideas?</Text>
             <Text style={styles.contactText}>We would love to hear from you.</Text>
           </View>
-          <TouchableOpacity style={styles.contactButton} onPress={openEmail}>
+          <TouchableOpacity style={styles.contactButton} onPress={openSupportEmail}>
             <Mail size={17} color="#16171b" />
             <Text style={styles.contactButtonText}>Email us</Text>
           </TouchableOpacity>

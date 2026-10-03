@@ -1,119 +1,91 @@
-# Splitify
+# Growl
 
-A modern mobile application for managing shared expenses and splitting bills with friends, family, and roommates.
+**Grow Your Wealth Together**
 
-## Overview
+Growl is a mobile app for one thing: running a group susu — the rotating savings group common
+across Ghana and West Africa. Everyone in the circle contributes a set amount each week, and
+each member takes the full pot in turn.
 
-Splitify simplifies the process of tracking shared expenses and settling debts among groups. Whether you're splitting rent, organizing a group trip, or coordinating household expenses, Splitify makes it easy to keep track of who owes whom and simplify the settlement process.
+## What Growl does
 
-## Features
+- **Create a susu group** — set the group name, the pot per round, the collection day, and the members in rotation order.
+- **Fixed weekly rotation** — every member knows whose turn it is and when.
+- **Contributions** — members log what they paid, the mobile money they used, and the transaction reference.
+- **Verification before payout** — a pot is only released once every contribution for the round is verified.
+- **Payouts with failure handling** — the pot goes to the collector's mobile money; a rejected transfer can be retried without losing the round.
+- **Miss policy** — one free skip, the missed share carries forward, and a second miss removes a member from the rotation.
+- **Admin accountability** — a trust score drops with each fake transaction, and two flags revoke the admin's privileges.
+- **Group history** — every contribution, payout, and missed share stays visible to all members.
 
-- **Expense Tracking**: Record shared expenses in real-time
-- **Smart Calculations**: Automatically calculate fair splits among participants
-- **Multiple Split Options**: Split evenly, by custom amounts, or by percentage
-- **Debt Settlement**: Simplify payments with intelligent debt optimization
-- **Group Management**: Create and manage multiple expense groups
-- **Transaction History**: Complete record of all expenses and settlements
-- **Cross-Platform**: Available on iOS, Android, and Web
+## Running the tests
+
+```bash
+npm test
+```
 
 ## Tech Stack
 
-- **Framework**: React Native with Expo
+- **Framework**: React Native with Expo (SDK 57)
 - **Routing**: Expo Router
-- **UI Components**: Lucide React Native icons
-- **Platform Support**: iOS, Android, Web
-- **Runtime**: Node.js & JavaScript
+- **State**: Zustand
+- **UI**: Lucide React Native icons
+- **Platforms**: iOS, Android, Web
 
 ## Prerequisites
 
-- Node.js (LTS recommended)
-- npm or yarn package manager
+- Node.js (LTS)
+- npm or yarn
 - Expo CLI: `npm install -g expo-cli`
-- Xcode (for iOS development)
-- Android Studio (for Android development)
 
 ## Installation
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/Qhojoblinks-7/Splitify.git
-cd Splitify
-```
-
-2. Install dependencies:
-```bash
+git clone https://github.com/Qhojoblinks-7/growl.git
+cd growl
 npm install
 ```
 
-## Getting Started
+## Running the app
 
-### Development Server
-
-Start the Expo development server:
 ```bash
-npm start
-```
-
-### Run on iOS
-```bash
-npm run ios
-```
-
-### Run on Android
-```bash
+npm start     # start the dev server
+npm run ios   # iOS simulator
 npm run android
-```
-
-### Run on Web
-```bash
 npm run web
 ```
 
 ## Project Structure
 
 ```
-Splitify/
-├── app/                    # App screens and routing
-├── components/             # Reusable UI components
-├── package.json           # Project dependencies
-└── expo.json              # Expo configuration
+growl/
+├── app/
+│   ├── (tabs)/          # Susu · Activity · Account
+│   ├── Auth/            # Sign in / sign up / password flows
+│   ├── susu/            # Create group, group detail
+│   ├── onboarding.jsx
+│   └── _layout.jsx
+├── components/
+│   ├── atoms/           # Buttons and inputs
+│   └── molecule/        # BottomSheet, EmptyState, Susu cards, SusuCreateForm
+├── services/
+│   ├── susu.js          # Susu rules: rotation, pot, misses, validation
+│   └── directory.js     # Member search
+├── store/susu.js        # Susu state and actions
+├── __tests__/           # Domain rule and store tests
+└── app.json             # Expo config
 ```
 
-## Key Dependencies
+## Current State
 
-- **expo**: ~57.0.21 - Framework for React Native development
-- **react-native**: 0.86.3 - Core React Native library
-- **expo-router**: ~57.0.20 - File-based routing
-- **lucide-react-native**: ^1.16.0 - Icon library
-- **react-native-svg**: 15.15.4 - SVG support
-
-## Contributing
-
-We welcome contributions! Please feel free to submit pull requests or open issues for bugs and feature requests.
-
-### Development Workflow
-
-1. Create a feature branch: `git checkout -b feature/your-feature-name`
-2. Make your changes and commit: `git commit -m "Description of changes"`
-3. Push to your branch: `git push origin feature/your-feature-name`
-4. Open a pull request
+The app is currently front-end only. Susu groups, contributions, and payouts run against
+in-memory mock data in `store/susu.js`, and are covered by 57 domain tests. The next step
+is wiring those store actions to the backend endpoints and mobile money provider
+verification described in `.kilo/plans/178921725-group-susu.md`.
 
 ## License
 
-This project is open source and available for public use.
-
-## Support
-
-For issues, questions, or suggestions, please open an issue on the [GitHub repository](https://github.com/Qhojoblinks-7/Splitify).
-
-## Future Roadmap
-
-- Cloud synchronization
-- Real-time notifications
-- Currency conversion support
-- Advanced reporting and analytics
-- Payment gateway integration
+Open source, available for public use.
 
 ---
 
-**Built with ❤️ by Qhojoblinks-7**
+**Built by Qhojoblinks-7**
