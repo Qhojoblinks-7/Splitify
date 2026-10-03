@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const DEFAULT_HEIGHT = "92%";
+const DEFAULT_MAX_HEIGHT = "92%";
 
 const BACKDROP_MAX_OPACITY = 0.6;
 const DISMISS_DISTANCE_RATIO = 0.3;
@@ -29,7 +29,7 @@ const SPRING_CONFIG = {
   restSpeedThreshold: 2,
 };
 
-function resolvePanelHeight(value, viewport) {
+function resolveMaxHeight(value, viewport) {
   if (!viewport) return 0;
   const ratio = typeof value === "number" ? value : parseFloat(String(value).replace("%", "")) / 100;
   const safeRatio = Number.isFinite(ratio) && ratio > 0 && ratio <= 1 ? ratio : 0.92;
@@ -41,7 +41,7 @@ export default function BottomSheet({
   onClose,
   title,
   children,
-  height = DEFAULT_HEIGHT,
+  maxHeight = DEFAULT_MAX_HEIGHT,
   bottomInset = 0,
 }) {
   const insets = useSafeAreaInsets();
@@ -51,10 +51,12 @@ export default function BottomSheet({
   // a tab navigator bar, which the safe-area inset alone does not describe.
   const bottomPadding = Math.max(insets.bottom + bottomInset, MIN_BOTTOM_GAP);
 
+  const heightCeiling = useMemo(() => resolveMaxHeight(maxHeight, viewport), [maxHeight, viewport]);
+
   const [isRendered, setIsRendered] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-
-  const panelHeight = useMemo(() => resolvePanelHeight(height, viewport), [height, viewport]);
+  const [panelHeight, setPanelHeight] = useState(0);
+  const [isMeasuring, setIsMeasuring] = useState(false);
 
   const offsetRef = useRef(null);
   if (offsetRef.current === null) {
@@ -66,6 +68,7 @@ export default function BottomSheet({
   const dragStartRef = useRef(0);
   const isDragging = useRef(false);
   const isOpenRef = useRef(false);
+  const panelHeightRef = useRef(0);
 
   const animate = useCallback(
     (toValue, velocity = 0, onComplete) => {
@@ -90,24 +93,50 @@ export default function BottomSheet({
 
   useEffect(() => {
     if (isVisible) {
-      setIsRendered(true);
-    }
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (!isRendered) return;
-
-    if (isVisible) {
-      if (panelHeight <= 0) return;
+      // Guarded so a viewport change while open (rotation, or an Android
+      // resize when the keyboard shows) does not restart the entry animation.
+      if (isOpenRef.current) return;
       isOpenRef.current = true;
+      setIsRendered(true);
       setIsOpen(true);
-      animate(0);
+      // Measure afresh on every open: content can change between openings. The
+      // previous height is kept so the sheet still has a value to animate from.
+      setIsMeasuring(true);
+      offsetRefValue.current = viewport;
+      offset.setValue(viewport);
     } else if (isOpenRef.current) {
       isOpenRef.current = false;
       setIsOpen(false);
-      animate(panelHeight, 0, () => setIsRendered(false));
+      setIsMeasuring(false);
+      const target = panelHeightRef.current || viewport;
+      animate(target, 0, () => setIsRendered(false));
     }
-  }, [animate, isRendered, isVisible, panelHeight]);
+  }, [animate, isVisible, offset, viewport]);
+
+  const handlePanelLayout = useCallback((event) => {
+    const measured = event.nativeEvent.layout.height;
+    if (measured <= 0) return;
+    panelHeightRef.current = measured;
+    setPanelHeight(measured);
+    setIsMeasuring(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || isMeasuring || panelHeight <= 0) return;
+    animate(0);
+  }, [animate, isMeasuring, isOpen, panelHeight]);
+
+  const settle = useCallback(
+    (velocity) => {
+      const projected = offsetRefValue.current + velocity * VELOCITY_PROJECTION;
+      if (velocity > DISMISS_VELOCITY || projected > panelHeight * DISMISS_DISTANCE_RATIO) {
+        requestClose();
+        return;
+      }
+      animate(0, velocity);
+    },
+    [animate, panelHeight, requestClose],
+  );
 
   const panResponder = useMemo(
     () =>
@@ -130,19 +159,14 @@ export default function BottomSheet({
         },
         onPanResponderRelease: (_, gesture) => {
           isDragging.current = false;
-          const projected = offsetRefValue.current + gesture.vy * VELOCITY_PROJECTION;
-          if (gesture.vy > DISMISS_VELOCITY || projected > panelHeight * DISMISS_DISTANCE_RATIO) {
-            requestClose();
-            return;
-          }
-          animate(0, gesture.vy);
+          settle(gesture.vy);
         },
         onPanResponderTerminate: () => {
           isDragging.current = false;
-          animate(0);
+          settle(0);
         },
       }),
-    [animate, offset, panelHeight, requestClose],
+    [animate, offset, panelHeight, settle],
   );
 
   const backdropOpacity = useMemo(
@@ -155,7 +179,7 @@ export default function BottomSheet({
     [offset, panelHeight],
   );
 
-  if (!isRendered || panelHeight <= 0) {
+  if (!isRendered || (!isMeasuring && panelHeight <= 0)) {
     return null;
   }
 
@@ -171,13 +195,14 @@ export default function BottomSheet({
       </Animated.View>
 
       <Animated.View
+        onLayout={isMeasuring ? handlePanelLayout : undefined}
         style={[
           styles.sheet,
-          {
-            height: panelHeight,
-            paddingBottom: bottomPadding,
-            transform: [{ translateY: offset }],
-          },
+          { paddingBottom: bottomPadding, transform: [{ translateY: offset }] },
+          // While measuring the sheet is free to take its natural content height,
+          // capped only by the ceiling. Afterwards the height is pinned so the
+          // content scrolls inside it rather than growing without bound.
+          isMeasuring ? { maxHeight: heightCeiling } : { height: panelHeight },
         ]}
       >
         <View {...panResponder.panHandlers} style={styles.grabberArea}>
@@ -187,7 +212,7 @@ export default function BottomSheet({
 
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.body}
+          style={isMeasuring ? styles.bodyMeasuring : styles.bodyPinned}
         >
           {children}
         </KeyboardAvoidingView>
@@ -239,7 +264,11 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     textAlign: "center",
   },
-  body: {
+  bodyMeasuring: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  bodyPinned: {
     flex: 1,
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Checkbox from 'expo-checkbox';
 import { Mail, Lock } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
