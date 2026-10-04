@@ -305,3 +305,18 @@ class TestAuditTrail:
     def test_an_event_survives_the_actor_account_being_irrelevant(self, admin, rnd):
         event = AuditEvent.record(actor=admin, action="round.opened", target=rnd, to_state="open")
         assert AuditEvent.objects.filter(pk=event.pk).exists()
+
+    def test_an_event_about_a_contribution_lands_in_the_group_feed(self, rnd):
+        # The feed is filtered by group. An event whose group failed to resolve is invisible
+        # to the very members it concerns, which is worse than not recording it at all.
+        from susu.models import Contribution
+
+        membership = Membership.objects.get(pk=rnd.roster_snapshot[0]["membership_id"])
+        contribution = Contribution.objects.create(
+            round=rnd, membership=membership, amount_pesewas=10000,
+            provider="mtn_momo", reference="MP-G1", status=Contribution.Status.VERIFIED,
+        )
+        event = AuditEvent.record(actor=None, action="contribution.recorded", target=contribution)
+
+        assert event.group_id == rnd.group_id
+        assert AuditEvent.objects.filter(group_id=rnd.group_id, pk=event.pk).exists()

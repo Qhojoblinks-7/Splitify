@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
+# `.env` holds this machine's LAN address for phone testing, so it is never shared or committed.
+.env
 .env*.local
 
 # typescript

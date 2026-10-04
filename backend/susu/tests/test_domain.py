@@ -369,12 +369,27 @@ class TestContributionAttempts:
         Contribution.objects.filter(pk=pending.pk).update(status="verified")
         assert rnd.verified_total_pesewas() == 10000
 
-    def test_an_idempotency_key_is_accepted_once(self, rnd, roster):
+    def test_a_replayed_idempotency_key_returns_the_original_payment(self, rnd, roster):
+        # C-S5: a replay is a retry, and a retry must not become a second cedi. The old
+        # behaviour raised here, which answered a member's retry with a database error.
         key = "a" * 32
+        first = Contribution.record(rnd, roster[0], amount_pesewas=10000, idempotency_key=key)
+
+        replay = Contribution.record(rnd, roster[0], amount_pesewas=10000, idempotency_key=key)
+
+        assert replay.pk == first.pk
+        assert Contribution.objects.count() == 1
+
+    def test_one_member_cannot_collect_another_members_payment_with_a_guessed_key(
+        self, rnd, roster
+    ):
+        # The key is globally unique, so a member who guesses or reuses another's key must be
+        # refused rather than handed that member's amount and reference. P2, P9.
+        key = "b" * 32
         Contribution.record(rnd, roster[0], amount_pesewas=10000, idempotency_key=key)
-        with pytest.raises(IntegrityError):
-            with transaction.atomic():
-                Contribution.record(rnd, roster[1], amount_pesewas=10000, idempotency_key=key)
+
+        with pytest.raises(Contribution.IdempotencyKeyConflict):
+            Contribution.record(rnd, roster[1], amount_pesewas=10000, idempotency_key=key)
 
     def test_a_member_cannot_be_charged_more_than_twice_their_frozen_share(self, rnd, roster):
         share = rnd.share_for(roster[0])

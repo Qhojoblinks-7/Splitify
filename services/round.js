@@ -217,27 +217,32 @@ export function allocateDebt(round, group, roundNumber = round.number) {
  * attributable to the group, and reduces what the group needs to collect next round.
  *
  * Note this is money only. Debt is deliberately excluded: a debt is a claim on future
- * contributions, not a cedi that has left the pot. Charging debt here as well would
- * deduct the same funds twice.
+ * contributions, not a cedi that has left the pot. Charging debt here as well would deduct
+ * the same funds twice.
+ *
+ * There is deliberately no `reversals` term. A reversed attempt is already excluded from
+ * `verifiedTotal`, so subtracting it again would remove a cedi that is still in the
+ * collection account — the backend shipped exactly that bug, and this signature is what
+ * invited it.
  */
-export function closingFloat(round, group, { paid = 0, fees = 0, reversals = 0 } = {}) {
+export function closingFloat(round, group, { paid = 0, fees = 0 } = {}) {
   const verified = verifiedTotal(group, round.number);
-  const float = verified - paid - fees - reversals;
+  const float = verified - paid - fees;
   return float > 0 ? float : 0;
 }
 
 /**
  * The money identity. Must be zero for every round, always.
  *
- *   verified − paid − fees − reversals − float = 0
+ *   verified − paid − fees − float = 0
  *
  * A non-zero residual therefore means money left the round that never entered it — the
  * one unrecoverable error class. Everything else balances by construction.
  */
-export function conservationResidual(round, group, { paid = 0, fees = 0, reversals = 0 } = {}) {
+export function conservationResidual(round, group, { paid = 0, fees = 0 } = {}) {
   const verified = verifiedTotal(group, round.number);
-  const float = closingFloat(round, group, { paid, fees, reversals });
-  return verified - paid - fees - reversals - float;
+  const float = closingFloat(round, group, { paid, fees });
+  return verified - paid - fees - float;
 }
 
 /**

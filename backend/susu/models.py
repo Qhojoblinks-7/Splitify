@@ -14,8 +14,18 @@ import uuid
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
+
+from .ledger import (
+    AppendOnlyModel,
+    AuditEvent,
+    LedgerAccount,
+    LedgerEntry,
+    LedgerPosting,
+    PostingType,
+    ledger_natural_sign,
+)
 
 PESEWAS_PER_CEDI = 100
 DAY = timedelta(days=1)
@@ -49,6 +59,76 @@ def to_pesewas(value):
         raise ValidationError("Not a valid amount")
     whole, fraction = match
     return int(whole) * PESEWAS_PER_CEDI + int((fraction or "").ljust(2, "0") or 0)
+
+
+def allocate_debt(shortfall_pesewas, shares):
+    """Split a shortfall across the members who did not pay, by their frozen shares.
+
+    `shares` is `[(membership_id, share_pesewas)]` in rotation order. Returns
+    `{membership_id: charged_pesewas}` for the members who owe.
+
+    Water-filling: split proportionally, cap anyone who has reached their own share, and
+    redistribute what they could not take among whoever still has room. Two properties matter
+    more than the split itself:
+
+      exactly conserving  the charges always sum to the shortfall, never a pesewa more and
+                          never a pesewa less. The indivisible cedi is handed to the largest
+                          fractional claim, with rotation order breaking ties, so the result
+                          is deterministic rather than dependent on dictionary order.
+      capped at the share  a member never owes more than they agreed to. Anything beyond that
+                          is the group inventing a debt nobody accepted.
+
+    This mirrors `allocateDebt` in `services/round.js` exactly. The client runs this
+    calculation to show a member what they owe while offline, and the server runs it to decide
+    what to book. If the two ever disagree by a single pesewa, the member sees one number and
+    is charged another.
+    """
+    if shortfall_pesewas <= 0 or not shares:
+        return {}
+
+    remaining = min(shortfall_pesewas, sum(share for _, share in shares))
+    charged = {}
+    active = list(shares)
+
+    while remaining > 0 and active:
+        weights = sum(share for _, share in active)
+
+        # Provisional split, floored so nobody is provisionally over-charged.
+        provisional = {}
+        remainders = []
+        for index, (membership_id, share) in enumerate(active):
+            numerator = remaining * share
+            provisional[membership_id] = numerator // weights
+            remainders.append((membership_id, numerator - provisional[membership_id] * weights, index))
+
+        # The indivisible cedi goes to the largest fractional claims; rotation order breaks
+        # ties, so the same shortfall always splits the same way.
+        remainders.sort(key=lambda item: (-item[1], item[2]))
+        leftover = remaining - sum(provisional.values())
+        for membership_id, _, _ in remainders:
+            if leftover <= 0:
+                break
+            provisional[membership_id] += 1
+            leftover -= 1
+
+        capped = []
+        still_active = []
+        for membership_id, share in active:
+            if provisional[membership_id] >= share:
+                charged[membership_id] = share
+                remaining -= share
+                capped.append(membership_id)
+            else:
+                still_active.append((membership_id, share))
+
+        if not capped:
+            for membership_id, _ in active:
+                charged[membership_id] = provisional[membership_id]
+            remaining = 0
+        else:
+            active = still_active
+
+    return charged
 
 
 def re_full_amount(text):
@@ -253,7 +333,14 @@ class Round(models.Model):
     closed_at = models.DateTimeField(null=True, blank=True)
 
     outcome = models.CharField(max_length=10, choices=Outcome.choices, default=Outcome.OPEN)
+    # Money brought in from the previous round, and money left behind by this one. Both are
+    # facts recorded once at the boundary, never recomputed later, so the float cannot be
+    # counted twice or quietly restated.
     carried_float_pesewas = models.BigIntegerField(default=0)
+    closing_float_pesewas = models.BigIntegerField(default=0)
+    # Bumped on every booking so each revision's postings get a distinct, deterministic
+    # reference. Without it a recomputed charge could collide with its own earlier posting.
+    debt_revision = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["-number"]
@@ -288,7 +375,20 @@ class Round(models.Model):
         if not roster:
             raise ValidationError("A group needs at least one active member to open a round")
 
-        target = group.target_pesewas
+        # The cursor and round number are authoritative in the database, not on whichever
+        # instance the caller happened to be holding. A caller whose copy predates a
+        # completed payout would otherwise open a second round with a number already taken,
+        # and the failure would surface as a unique-constraint error about a race.
+        group.refresh_from_db(fields=["current_round", "turn_cursor", "cycle"])
+
+        # Z2: money the previous round collected and never paid out belongs to the group and
+        # reduces what they still owe. Demanding it a second time is the defect this prevents.
+        # The floor keeps a round's target above zero, so a float large enough to cover the
+        # whole next target leaves the remainder on the books instead of being spent by
+        # arithmetic and lost.
+        carried = cls._unspent_float(group)
+        target = max(1, to_pesewas(group.target_pesewas) - carried)
+
         # Rotation order from the cursor, so the receiver is first and absorbs the
         # indivisible cedi in the share allocation.
         ordered = roster[group.turn_cursor % len(roster):] + roster[: group.turn_cursor % len(roster)]
@@ -301,6 +401,7 @@ class Round(models.Model):
                 "name": str(m.account),
                 "order": m.order,
                 "share_pesewas": shares[m.id],
+                "charged_pesewas": 0,
             }
             for m in ordered
         ]
@@ -315,7 +416,20 @@ class Round(models.Model):
             roster_snapshot=snapshot,
             opened_at=at,
             due_at=cls.due_from(group.collection_day, at),
+            carried_float_pesewas=carried,
         )
+
+    @classmethod
+    def _unspent_float(cls, group):
+        """The most recent round's unspent float, in total.
+
+        Each closed round records what it left behind, so the running figure is the newest
+        closed round's balance rather than a sum that could double-count float carried more
+        than once. A float never applied stays on the books and reduces the target instead.
+        """
+        return cls.objects.filter(
+            group=group, closing_float_pesewas__gt=0
+        ).order_by("-number").values_list("closing_float_pesewas", flat=True).first() or 0
 
     @classmethod
     def open_current_for_test(cls, group):
@@ -384,14 +498,37 @@ class Round(models.Model):
 
     # -- money -----------------------------------------------------------
 
+    def current_float_pesewas(self):
+        """Money this round collected that no payout consumed, right now. Z2.
+
+    Read from the append-only record rather than from the mutable rows, so it is a fact about
+        the money rather than a restatement of the contributions.
+
+        The fee is excluded because it was withheld from the pot but never left the collection
+        account: it is still there, owed to the provider. Counting it as the group's money
+        would promise members cedi that belong to someone else. Debt is excluded entirely: a
+        debt is a claim on future contributions, not a cedi in the account.
+
+        A negative result is real and must be shown, not floored away. It means money left to
+        the receiver and was taken back, and the group has to see that. Z7.
+        """
+        return self.partner_balance_pesewas() - self.account_balance_pesewas(
+            LedgerAccount.FEE_PAYABLE
+        )
+
     def conservation_residual(self):
-        """The money identity. Must be zero for every round, always. Z1.
+        """The money identity, checked against the ledger. Must be zero for a sound round. Z1.
 
-            verified - released - fees - reversals - float = 0
+            float held - (verified - paid - fees) = 0
 
-        A non-zero residual means money left the round that never entered it. Debt is
-        deliberately excluded: a debt is a claim on future contributions, not a cedi that
-        has left the pot. See Z2a.
+        Both sides are computed from different places on purpose. The left is what the
+        append-only record says we hold; the right is what the mutable rows say we collected
+        and disbursed. If a status was written without a posting, or a posting without a
+        status, the two disagree and this is where it shows.
+
+        An earlier version computed `verified - paid - fees - max(0, that same expression)`,
+        which is zero by construction and therefore reported zero forever. A check that cannot
+        fail is not evidence, and it looked exactly like one. Z7.
         """
         released = sum(
             p.amount_pesewas for p in self.payouts.filter(status=Payout.Status.COMPLETED)
@@ -399,8 +536,45 @@ class Round(models.Model):
         fees = sum(
             p.fee_pesewas for p in self.payouts.filter(status=Payout.Status.COMPLETED)
         )
-        float_pesewas = max(0, self.verified_total_pesewas() - released - fees)
-        return self.verified_total_pesewas() - released - fees - float_pesewas
+        expected = self.verified_total_pesewas() - released - fees
+        return self.current_float_pesewas() - expected
+
+    # -- ledger ----------------------------------------------------------
+
+    def ledger_debits_pesewas(self):
+        return sum(
+            e.amount_pesewas
+            for e in self.ledger_entries.filter(direction=LedgerEntry.Direction.DEBIT)
+        )
+
+    def ledger_credits_pesewas(self):
+        return sum(
+            e.amount_pesewas
+            for e in self.ledger_entries.filter(direction=LedgerEntry.Direction.CREDIT)
+        )
+
+    def ledger_residual_pesewas(self):
+        """The independent check that the ledger balances. Must be zero, always.
+
+        Computed from the append-only record, not from the mutable contribution rows, so it
+        cannot be made to balance by the same bug that broke it. Z1.
+        """
+        return self.ledger_debits_pesewas() - self.ledger_credits_pesewas()
+
+    def partner_balance_pesewas(self):
+        """Our cash position: money collected minus money paid out, fees excluded."""
+        return self.account_balance_pesewas(LedgerAccount.PARTNER_ACCOUNT)
+
+    def account_balance_pesewas(self, account):
+        """The balance of one account, signed so a positive number is what it is worth."""
+        entries = self.ledger_entries.filter(account=account)
+        debit = sum(
+            e.amount_pesewas for e in entries if e.direction == LedgerEntry.Direction.DEBIT
+        )
+        credit = sum(
+            e.amount_pesewas for e in entries if e.direction == LedgerEntry.Direction.CREDIT
+        )
+        return (debit - credit) * ledger_natural_sign(account)
 
     def debt_residual(self):
         """The debt identity, kept separate from money. Z2a.
@@ -408,9 +582,184 @@ class Round(models.Model):
             0 <= shortfall - sum(debt booked for this round)
         """
         booked = sum(
-            entry["share_pesewas"] for entry in self.roster_snapshot if entry.get("charged_pesewas")
+            entry.get("charged_pesewas", 0) for entry in self.roster_snapshot
         )
         return self.shortfall_pesewas() - booked
+
+    def non_contributor_ids(self):
+        """Rotation order. The order matters: it breaks ties in the debt split, so a member
+        who pays first is not charged differently run to run. D2."""
+        counted = set(
+            self.contributions.filter(status=Contribution.Status.VERIFIED).values_list(
+                "membership_id", flat=True
+            )
+        )
+        return [
+            entry["membership_id"]
+            for entry in self.roster_snapshot
+            if entry["membership_id"] not in counted
+        ]
+
+    def debt_allocation(self):
+        """What each member owes this round, derived from the frozen shares. Pure.
+
+        Derived rather than accumulated, so a member who pays late stops owing automatically.
+        Charging debt nobody has discharged is how a group ends up demanding money twice.
+        """
+        gap = self.shortfall_pesewas()
+        if gap <= 0:
+            return {}
+
+        shares_by_member = {entry["membership_id"]: entry["share_pesewas"]
+                            for entry in self.roster_snapshot}
+        owing = [
+            (membership_id, shares_by_member[membership_id])
+            for membership_id in self.non_contributor_ids()
+        ]
+        return allocate_debt(gap, owing)
+
+    @transaction.atomic
+    def book_debt(self, *, actor=None, reason=""):
+        """Book this round's debt, posting only what changed.
+
+        Re-derived on every call rather than appended to, so a late payment clears its
+        owner's charge and a member who has already paid is never chased. Only the difference
+        is posted: booking an unchanged round writes nothing, which is what makes this safe
+        to call from more than one place.
+
+        Debt posts to `debt_receivable` and `member_payable` and nowhere else. No cedi moved,
+        so the collection account and the pot are untouched and the float is unaffected. A
+        debt that reduced the float would tell a member they have less money than they do.
+        D2, Z2a, Z1.
+        """
+        if self.outcome != self.Outcome.OPEN:
+            raise ValidationError("Debt is booked against an open round")
+
+        allocation = self.debt_allocation()
+        snapshot = [dict(entry) for entry in self.roster_snapshot]
+
+        self.debt_revision += 1
+        revision = self.debt_revision
+
+        for entry in snapshot:
+            membership_id = entry["membership_id"]
+            previous = entry.get("charged_pesewas", 0)
+            wanted = allocation.get(membership_id, 0)
+            delta = wanted - previous
+            entry["charged_pesewas"] = wanted
+            if delta == 0:
+                continue
+
+            reference = f"debt-r{self.number}-rev{revision}-m{membership_id}"
+            if delta > 0:
+                legs = [
+                    {"account": LedgerAccount.DEBT_RECEIVABLE,
+                     "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": delta},
+                    {"account": LedgerAccount.MEMBER_PAYABLE,
+                     "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": delta},
+                ]
+                entry_type = PostingType.DEBT
+            else:
+                legs = [
+                    {"account": LedgerAccount.MEMBER_PAYABLE,
+                     "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": -delta},
+                    {"account": LedgerAccount.DEBT_RECEIVABLE,
+                     "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": -delta},
+                ]
+                entry_type = PostingType.REVERSAL
+
+            LedgerEntry.post(self, legs, entry_type=entry_type, reference=reference,
+                             actor=actor)
+
+            # The running total belongs to the person, so it carries across cycles. D5. The
+            # database constraint is left to catch a reduction below zero rather than having
+            # it clamped here, because a clamp would hide the corruption it is checking for.
+            Membership.objects.filter(pk=membership_id).update(
+                debt_pesewas=models.F("debt_pesewas") + delta
+            )
+
+            if delta > 0:
+                AuditEvent.record(
+                    actor=actor, action="debt.charged", target=self,
+                    group=self.group, reason=reason or f"{delta}p charged",
+                    actor_role="member" if actor else "system",
+                )
+
+        self.roster_snapshot = snapshot
+        self.save(update_fields=["roster_snapshot", "debt_revision"])
+
+        AuditEvent.record(
+            actor=actor, action="round.debt_booked", target=self,
+            to_state=f"{sum(allocation.values())}p", reason=reason,
+        )
+
+        return {"charged": allocation, "revision": revision, "residual": self.debt_residual()}
+
+    @transaction.atomic
+    def close(self, *, actor=None, reason=""):
+        """Decide this round's outcome, once, and record what it left behind. R5.
+
+        The only way a round ends without a payout having run. Everything else — a met pot, a
+        blocked payment, a dispute still open — is refused rather than decided here, because
+        deciding those is how a round ends up claiming money changed hands when it did not.
+
+        Four refusals, each of which is a way this could otherwise be gamed:
+
+          before the due date    otherwise a member closes a round early to escape paying it.
+          while flagged          the total is not yet a fact, so the outcome cannot be either.
+          while a payout flies   the round would close under money still in motion.
+          once already closed    the outcome is decided exactly once.
+
+        Debt is booked here rather than on demand, because a closed round that keeps
+        accruing obligations is not closed. Z2a, D2.
+        """
+        if self.outcome != self.Outcome.OPEN:
+            raise ValidationError("This round has already been closed")
+
+        if timezone.now() < self.due_at:
+            raise ValidationError("This round cannot be closed before its collection day")
+
+        if self.contributions.filter(
+            status__in=Contribution.BLOCKING_STATUSES
+        ).exists():
+            raise ValidationError(
+                "This round is blocked pending a decision on a flagged payment"
+            )
+
+        if self.payouts.filter(
+            status__in=[Payout.Status.QUEUED, Payout.Status.PROCESSING]
+        ).exists():
+            raise ValidationError("A payout is still in flight for this round")
+
+        if self.verified_total_pesewas() >= self.target_pesewas:
+            raise ValidationError(
+                "The pot has been met. This round closes when the payout completes, not before."
+            )
+
+        self.book_debt(actor=actor, reason=reason)
+        return self._finalise(self.Outcome.SHORT, actor=actor, reason=reason)
+
+    @transaction.atomic
+    def _finalise(self, outcome, *, actor=None, reason=""):
+        """Record the outcome and the float leaving, then advance the rotation. R5, R9.
+
+        Shared with the payout path so there is one place that closes a round, and therefore
+        no way for two of them to disagree about what closing means.
+        """
+        self.outcome = outcome
+        self.closed_at = timezone.now()
+        self.closing_float_pesewas = self.current_float_pesewas()
+        self.save(update_fields=["outcome", "closed_at", "closing_float_pesewas"])
+
+        self.group.current_round += 1
+        self.group.turn_cursor += 1
+        self.group.save(update_fields=["current_round", "turn_cursor"])
+
+        AuditEvent.record(
+            actor=actor, action="round.closed", target=self,
+            from_state=self.Outcome.OPEN, to_state=outcome, reason=reason,
+        )
+        return self
 
     # -- payout ----------------------------------------------------------
 
@@ -496,6 +845,13 @@ class Contribution(models.Model):
     class DuplicateReference(Exception):
         """The same cedi is already claimed against this person."""
 
+    class IdempotencyKeyConflict(Exception):
+        """An idempotency key already belongs to a different member's payment.
+
+        The key is globally unique, so this is either a client bug or an attempt to read
+        another member's payment by guessing their key. Refused rather than answered.
+        """
+
     round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="contributions")
     membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="contributions")
 
@@ -572,6 +928,28 @@ class Contribution(models.Model):
                 f"A contribution cannot exceed {MAX_MULTIPLE_OF_SHARE} times a member's share"
             )
 
+        # C-S5, and this check has to come before every state-dependent refusal below. The
+        # offline queue replays writes it could not confirm; the replay arrives while the
+        # original still holds the member's slot, so checking the slot first would answer a
+        # retry with "you already have a payment recorded" and the client could never tell a
+        # retry from a genuine second attempt. An idempotent write returns its original
+        # result, whatever the state has become since.
+        key = None
+        if idempotency_key:
+            try:
+                key = uuid.UUID(str(idempotency_key))
+            except (ValueError, AttributeError, TypeError) as exc:
+                raise ValidationError("That idempotency key is not a valid identifier") from exc
+            replay = cls.objects.filter(idempotency_key=key).first()
+            if replay is not None:
+                # Only the member who owns the payment may collect its replay. Answering
+                # anybody else would hand one member another member's amount and reference.
+                if replay.round_id == round_.id and replay.membership_id == membership.pk:
+                    return replay
+                raise cls.IdempotencyKeyConflict(
+                    "That payment key has already been used for a different payment."
+                )
+
         if round_.open_slot_for(membership) is not None:
             raise cls.FrozenSlot(
                 "You already have a payment recorded for this round."
@@ -588,15 +966,151 @@ class Contribution(models.Model):
                 "That transaction reference has already been recorded."
             )
 
-        return cls.objects.create(
-            round=round_,
-            membership=membership,
-            amount_pesewas=amount,
-            provider=provider,
-            reference=reference,
-            idempotency_key=uuid.UUID(str(idempotency_key)) if idempotency_key else None,
-            paid_at=timezone.now(),
+        try:
+            # The inner atomic block so losing the unique-constraint race rolls back only the
+            # insert, not the caller's transaction.
+            with transaction.atomic():
+                return cls.objects.create(
+                    round=round_,
+                    membership=membership,
+                    amount_pesewas=amount,
+                    provider=provider,
+                    reference=reference,
+                    idempotency_key=key,
+                    paid_at=timezone.now(),
+                )
+        except IntegrityError:
+            # Two devices replaying the same queued write at the same moment. One wins; the
+            # other is told the truth rather than seeing a failed payment.
+            if key is not None:
+                replay = cls.objects.filter(idempotency_key=key).first()
+                if replay is not None:
+                    return replay
+            raise
+
+    # -- state transitions ------------------------------------------------
+    #
+    # A status change and its ledger posting happen in one transaction or not at all. The
+    # defect this replaces is a status written without a posting, which leaves the mutable
+    # round and the append-only record permanently disagreeing with no way to tell which
+    # one is right. Z1, Z3.
+
+    def _release(self, *, new_status, actor, reason, event):
+        """Leave the pending state without a provider outcome. Shared by the two paths below.
+
+        Neither posts to the ledger, and that is the point: no money arrived, so there is
+        nothing to record. What they do is release the member's slot, which the freeze rule
+        holds while an attempt might still become money. Without a way out of pending, one
+        payment the provider never confirms strands that member and the round permanently.
+        C-S2, D9.
+        """
+        if self.status != self.Status.PENDING:
+            raise ValidationError(
+                f"Only a pending contribution can be released; this one is {self.status}"
+            )
+
+        self.status = new_status
+        self.failure_reason = reason[:120]
+        self.save(update_fields=["status", "failure_reason"])
+
+        AuditEvent.record(
+            actor=actor, action=event, target=self,
+            from_state=self.Status.PENDING, to_state=new_status, reason=reason,
         )
+        return self
+
+    def mark_failed(self, *, actor=None, reason=""):
+        """The provider never confirmed this payment. The attempt is written off.
+
+        Used when a payment is known not to have landed. The inverse of a reversal: nothing
+        arrived, so nothing is posted.
+        """
+        return self._release(
+            new_status=self.Status.FAILED, actor=actor,
+            reason=reason or "The provider never confirmed this payment",
+            event="contribution.failed",
+        )
+
+    def mark_void(self, *, actor=None, reason=""):
+        """An attempt that should never have existed, cancelled by whoever made it.
+
+        A member who entered the wrong amount, or started a payment they did not intend.
+        Distinct from a failure: nobody is waiting on a provider, so there is no outcome to
+        report.
+        """
+        return self._release(
+            new_status=self.Status.VOID, actor=actor,
+            reason=reason or "Cancelled before it was sent",
+            event="contribution.voided",
+        )
+
+    @transaction.atomic
+    def mark_verified(self, *, actor=None, reason=""):
+        """Money has arrived. This is the only place the pot grows. C-S1.
+
+        A pending attempt is a claim, not a cedi: nothing is posted until the provider or a
+        manual check confirms the money. Manual verification therefore always leaves its
+        reason, so a human decision is never indistinguishable from a confirmed one.
+        """
+        if self.status == self.Status.VERIFIED:
+            raise ValidationError("This contribution has already been verified")
+        if self.status in self.TERMINAL_STATUSES:
+            raise ValidationError(f"A {self.status} contribution cannot be verified")
+
+        self.status = self.Status.VERIFIED
+        self.verified_at = timezone.now()
+        self.manual_verification_reason = reason[:240]
+        self.save(update_fields=["status", "verified_at", "manual_verification_reason"])
+
+        LedgerEntry.post(
+            self.round,
+            [
+                {"account": LedgerAccount.PARTNER_ACCOUNT,
+                 "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": self.amount_pesewas},
+                {"account": LedgerAccount.GROUP_POT,
+                 "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": self.amount_pesewas},
+            ],
+            entry_type=PostingType.COLLECTION,
+            reference=self.reference or f"contribution-{self.pk}",
+            actor=actor,
+        )
+        AuditEvent.record(
+            actor=actor, action="contribution.verified", target=self,
+            from_state=self.Status.PENDING, to_state=self.Status.VERIFIED, reason=reason,
+        )
+        return self
+
+    @transaction.atomic
+    def mark_reversed(self, *, actor=None, reason=""):
+        """The money came back out. Always the exact mirror of the collection.
+
+        Reversal is a posting, never an edit: the original stays and the counter-entry sits
+        beside it, so the sequence of events remains readable. C-S2, C-S7.
+        """
+        if self.status != self.Status.VERIFIED:
+            raise ValidationError("Only a verified contribution can be reversed")
+
+        self.status = self.Status.REVERSED
+        self.save(update_fields=["status"])
+
+        LedgerEntry.post(
+            self.round,
+            [
+                {"account": LedgerAccount.GROUP_POT,
+                 "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": self.amount_pesewas},
+                {"account": LedgerAccount.PARTNER_ACCOUNT,
+                 "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": self.amount_pesewas},
+            ],
+            entry_type=PostingType.REVERSAL,
+            reference=f"{self.reference or self.pk}-rev",
+            actor=actor,
+            note=reason,
+        )
+        AuditEvent.record(
+            actor=actor, action="contribution.reversed", target=self,
+            from_state=self.Status.VERIFIED, to_state=self.Status.REVERSED, reason=reason,
+        )
+        return self
 
 
 class Payout(models.Model):
@@ -660,4 +1174,65 @@ class Payout(models.Model):
         self.attempts = models.F("attempts") + 1
         self.save(update_fields=["status", "failure_reason", "attempts"])
         self.refresh_from_db()
+        return self
+
+    @transaction.atomic
+    def mark_completed(self, *, provider_reference="", actor=None):
+        """The money reached the receiver. The only path money leaves the partner account. P-S1.
+
+        Posts the pot and the fee separately. Folding the fee into the payout legs would make
+        the partner account stop reconciling with the partner's own balance, which is the
+        cheapest way to lose a cedi and the hardest to notice. P-S8.
+        """
+        if self.status == self.Status.COMPLETED:
+            raise ValidationError("This payout has already completed")
+        if self.status == self.Status.FAILED:
+            raise ValidationError(
+                "A failed payout cannot complete. Queue a retry with the same key instead."
+            )
+
+        previous = self.status
+        self.status = self.Status.COMPLETED
+        self.provider_reference = provider_reference[:100]
+        self.completed_at = timezone.now()
+        self.attempts = models.F("attempts") + 1
+        self.save(update_fields=["status", "provider_reference", "completed_at", "attempts"])
+        self.refresh_from_db()
+
+        LedgerEntry.post(
+            self.round,
+            [
+                {"account": LedgerAccount.GROUP_POT,
+                 "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": self.amount_pesewas},
+                {"account": LedgerAccount.PARTNER_ACCOUNT,
+                 "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": self.amount_pesewas},
+            ],
+            entry_type=PostingType.PAYOUT,
+            reference=self.payout_key,
+            actor=actor,
+        )
+
+        if self.fee_pesewas:
+            LedgerEntry.post(
+                self.round,
+                [
+                    {"account": LedgerAccount.FEE_EXPENSE,
+                     "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": self.fee_pesewas},
+                    {"account": LedgerAccount.FEE_PAYABLE,
+                     "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": self.fee_pesewas},
+                ],
+                entry_type=PostingType.FEE,
+                reference=f"{self.payout_key}-fee",
+                actor=actor,
+            )
+
+        AuditEvent.record(
+            actor=actor, action="payout.completed", target=self,
+            from_state=previous, to_state=self.Status.COMPLETED,
+        )
+
+        # P-S5: the rotation advances only on completion, never on instruction. An instructed
+        # payout that later fails must leave the round exactly as it was. Closing goes through
+        # the same path as any other close so the float is recorded identically.
+        self.round._finalise(Round.Outcome.PAID, actor=actor)
         return self

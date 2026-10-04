@@ -7,14 +7,51 @@ indexes and check constraints) rather than anything engine-specific.
 """
 
 import os
+import socket
 import sys
 from pathlib import Path
+
+from .environment import require_supported_django
+
+# Before anything else. Loading settings with the wrong interpreter otherwise fails much later,
+# as an obscure error inside a model definition rather than as a missing dependency.
+require_supported_django()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("GROWL_SECRET_KEY", "dev-only-not-for-production")
 DEBUG = os.environ.get("GROWL_DEBUG", "1") == "1"
-ALLOWED_HOSTS = os.environ.get("GROWL_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+
+def local_network_hosts():
+    """This machine's own LAN address, so a phone on the same Wi-Fi can be served.
+
+    A development convenience and nothing more: a hardcoded `localhost` ALLOWED_HOSTS rejects
+    every request from a physical device with a `DisallowedHost` 400, which looks like the app
+    failing to connect rather than like a host-header problem. Discovered by asking the socket
+    which local address it would use to reach the outside world — this sends no traffic, it just
+    reads what the routing table already decided.
+
+    Production sets GROWL_ALLOWED_HOSTS and gets a fixed list, never a wildcard.
+    """
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect(("8.8.8.8", 80))
+            address = probe.getsockname()[0]
+        finally:
+            probe.close()
+    except OSError:
+        return []
+    return [address] if not address.startswith("127.") else []
+
+
+if os.environ.get("GROWL_ALLOWED_HOSTS"):
+    ALLOWED_HOSTS = os.environ["GROWL_ALLOWED_HOSTS"].split(",")
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+    if DEBUG:
+        ALLOWED_HOSTS += local_network_hosts()
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -23,6 +60,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "susu",
 ]

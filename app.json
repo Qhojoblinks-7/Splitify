@@ -31,7 +31,8 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-secure-store"
     ],
     "experiments": {
       "autolinkingModuleResolution": true
