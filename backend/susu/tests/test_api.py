@@ -18,7 +18,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from accounts.models import Account
-from susu.models import Contribution, Membership, Round, SusuGroup
+from susu.models import Contribution, Membership, Payout, Round, SusuGroup
 
 pytestmark = pytest.mark.django_db
 
@@ -985,3 +985,98 @@ class TestAuthorizationAtTheEdge:
         routes = {str(pattern.pattern) for pattern in get_resolver().url_patterns}
         assert not any("payout" in route for route in routes)
         assert rnd.payouts.count() == 0
+
+
+# --------------------------------------------------------------------------
+# The member summary (the home tab's numbers, from the server)
+# --------------------------------------------------------------------------
+
+
+class TestMemberSummary:
+    def test_anonymous_requests_are_refused(self, group):
+        response = APIClient().get(reverse("member-summary"))
+        assert response.status_code == 401
+
+    def test_a_member_with_no_groups_sees_zeros(self, outsider):
+        data = api_for(outsider).get(reverse("member-summary")).data
+
+        assert data["groupCount"] == 0
+        assert data["activeGroupCount"] == 0
+        assert data["potTotalPesewas"] == 0
+        assert data["contributedPesewas"] == 0
+        assert data["receivedPesewas"] == 0
+        assert data["debtPesewas"] == 0
+        assert data["attentionCount"] == 0
+        assert data["groups"] == []
+        assert data["due"] == []
+
+    def test_the_summary_counts_only_the_callers_own_groups(self, group, admin, outsider):
+        data = api_for(admin).get(reverse("member-summary")).data
+
+        assert data["activeGroupCount"] == 1
+        assert data["adminOfCount"] == 1
+        assert data["potTotalPesewas"] == group.target_pesewas
+        assert [g["id"] for g in data["groups"]] == [group.id]
+        assert data["groups"][0]["myRole"] == "admin"
+
+        assert api_for(outsider).get(reverse("member-summary")).data["groups"] == []
+
+    def test_contributed_counts_verified_money_and_nothing_else(self, group, rnd, admin, payer):
+        client = api_for(payer)
+        log_payment(client, rnd)
+
+        # A logged payment is a claim, not money: it must not move the total.
+        assert api_for(payer).get(reverse("member-summary")).data["contributedPesewas"] == 0
+
+        contribution = Contribution.objects.get(membership__account=payer)
+        api_for(admin).post(
+            reverse("contribution-transition", args=[contribution.id, "verify"]),
+            {}, format="json",
+        )
+
+        data = api_for(payer).get(reverse("member-summary")).data
+        assert data["contributedPesewas"] == 10000
+
+    def test_received_counts_completed_payouts_to_the_caller(self, group, rnd, admin):
+        membership = Membership.objects.get(group=group, account=admin)
+        Payout.objects.create(
+            round=rnd, payout_key="summary-test-1", receiver=membership,
+            amount_pesewas=30000, status=Payout.Status.COMPLETED,
+        )
+
+        assert api_for(admin).get(reverse("member-summary")).data["receivedPesewas"] == 30000
+
+    def test_debt_is_summed_from_the_callers_memberships(self, group, rnd, payer):
+        Membership.objects.filter(account=payer).update(debt_pesewas=2500)
+
+        assert api_for(payer).get(reverse("member-summary")).data["debtPesewas"] == 2500
+
+    def test_due_lists_an_open_round_the_caller_has_not_paid(self, group, rnd, payer):
+        due = api_for(payer).get(reverse("member-summary")).data["due"]
+
+        assert [entry["groupId"] for entry in due] == [group.id]
+        assert due[0]["roundId"] == rnd.id
+        assert due[0]["sharePesewas"] == rnd.share_for(
+            Membership.objects.get(group=group, account=payer)
+        )
+
+    def test_a_round_with_an_attempt_in_flight_is_not_due(self, group, rnd, payer):
+        log_payment(api_for(payer), rnd)
+
+        assert api_for(payer).get(reverse("member-summary")).data["due"] == []
+
+    def test_a_verified_round_is_not_due(self, group, rnd, admin, payer):
+        contribution = log_payment(api_for(payer), rnd).data["id"]
+        api_for(admin).post(
+            reverse("contribution-transition", args=[contribution, "verify"]),
+            {}, format="json",
+        )
+
+        assert api_for(payer).get(reverse("member-summary")).data["due"] == []
+
+    def test_attention_counts_the_callers_open_attempts(self, group, rnd, payer, admin):
+        log_payment(api_for(payer), rnd, reference="API-MP-ATTN")
+        # Somebody else's attempt is not this member's attention.
+        log_payment(api_for(admin), rnd, reference="API-MP-OTHER")
+
+        assert api_for(payer).get(reverse("member-summary")).data["attentionCount"] == 1

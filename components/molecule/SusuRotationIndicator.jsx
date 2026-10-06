@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Check } from "lucide-react-native";
 import { getDayLabel } from "../../utils/dayLabel";
+import colors from "../../theme/colors";
 
 export default function SusuRotationIndicator({ members, currentTurnIndex, payouts = [], userId }) {
   return (
@@ -26,7 +27,7 @@ export default function SusuRotationIndicator({ members, currentTurnIndex, payou
               </Text>
               {isPast && (
                 <View style={styles.checkWrap}>
-                  <Check size={10} color="#16171b" />
+                  <Check size={10} color={colors.background} />
                 </View>
               )}
             </View>
@@ -61,25 +62,25 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1e1f24",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#2a2b30",
+    borderColor: colors.borderSubtle,
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#2a2b30",
+    backgroundColor: colors.borderSubtle,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
-  avatarCurrent: { backgroundColor: "#fbb81c" },
-  avatarPast: { backgroundColor: "#4ade80" },
-  avatarText: { color: "#8e8e93", fontSize: 14, fontWeight: "700" },
-  avatarTextActive: { color: "#16171b" },
+  avatarCurrent: { backgroundColor: colors.gold },
+  avatarPast: { backgroundColor: colors.success },
+  avatarText: { color: colors.textMuted, fontSize: 14, fontWeight: "700" },
+  avatarTextActive: { color: colors.background },
   checkWrap: {
     position: "absolute",
     right: -2,
@@ -87,18 +88,18 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: "#4ade80",
+    backgroundColor: colors.success,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#1e1f24",
+    borderColor: colors.surface,
   },
   info: { flex: 1 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  name: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
+  name: { color: colors.text, fontSize: 15, fontWeight: "600" },
   youTag: {
-    color: "#16171b",
-    backgroundColor: "#fbb81c",
+    color: colors.background,
+    backgroundColor: colors.gold,
     fontSize: 9,
     fontWeight: "800",
     paddingHorizontal: 5,
@@ -106,10 +107,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: "hidden",
   },
-  adminTag: { color: "#8e8e93", fontSize: 9, fontWeight: "700" },
-  status: { color: "#8e8e93", fontSize: 12, marginTop: 2 },
+  adminTag: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
+  status: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   currentTag: {
-    color: "#fbb81c",
+    color: colors.gold,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,

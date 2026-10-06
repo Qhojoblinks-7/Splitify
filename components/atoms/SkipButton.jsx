@@ -1,5 +1,6 @@
 import React from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
+import colors from "../../theme/colors";
 
 export default function SkipButton({ onPress }) {
   return (
@@ -12,8 +13,8 @@ export default function SkipButton({ onPress }) {
 const styles = StyleSheet.create({
   button: {
     paddingHorizontal: 28, // Matches the exact horizontal layout padding of your NextButton
-    backgroundColor: "#0f0f0f", // Sleek dark mode background canvas
-    borderColor: "#fbb81c", // Premium yellow border frame matching your design
+    backgroundColor: colors.canvas, // Sleek dark mode background canvas
+    borderColor: colors.gold, // Premium yellow border frame matching your design
     borderWidth: 1,
     borderRadius: 50,
     height: 50, // Lock this to 50px so it sits on the identical plane line
@@ -22,7 +23,7 @@ const styles = StyleSheet.create({
     minWidth: 120, // Guarantees its baseline box footprint matches NextButton exactly!
   },
   text: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "bold",
   },

@@ -36,6 +36,8 @@ import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
+logger = logging.getLogger("susu.rail")
+
 
 class Outcome:
     CONFIRMED = "confirmed"
@@ -365,26 +367,46 @@ def get_rail():
         "fincra": FincraRail,
     }
 
-    # If explicitly set to a specific adapter, use it (or fail)
+    if name == "unconfigured":
+        logger.info("No rail configured; using UnconfiguredRail (manual verify only)")
+        return UnconfiguredRail()
+
+    if name == "stub":
+        return StubRail()
+
     if name in adapters:
         try:
-            return adapters[name]()
+            rail = adapters[name]()
+            logger.info("Using configured rail: %s", rail.name)
+            return rail
         except ValidationError:
             if name == "hubtel":
-                # Primary failed; try fallback if available
+                logger.warning(
+                    "Hubtel configured but failed initialisation; falling back to Fincra"
+                )
                 try:
-                    return FincraRail()
+                    rail = FincraRail()
+                    logger.info("Fincra fallback initialised successfully")
+                    return rail
                 except ValidationError:
-                    pass
+                    logger.error("Fincra fallback also failed; no rail available")
+                    raise
             raise
 
-    # If not a known name, try primary then fallback
     for adapter_name in ("hubtel", "fincra"):
         try:
-            return adapters[adapter_name]()
+            rail = adapters[adapter_name]()
+            if adapter_name == "fincra":
+                logger.warning(
+                    "Hubtel not configured or unavailable; using Fincra as fallback"
+                )
+            else:
+                logger.info("Auto-selected rail: %s", rail.name)
+            return rail
         except ValidationError:
             continue
 
+    logger.info("No rail configured; using UnconfiguredRail (manual verify only)")
     return UnconfiguredRail()
 
 

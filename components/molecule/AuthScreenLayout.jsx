@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Image, StyleSheet } from "react-native";
+import colors from "../../theme/colors";
 
 export default function AuthScreenLayout({ title, children, footer }) {
   return (
@@ -15,7 +16,7 @@ export default function AuthScreenLayout({ title, children, footer }) {
 const styles = StyleSheet.create({
   Container: {
     flex: 1,
-    backgroundColor: "#16171b",
+    backgroundColor: colors.background,
     paddingHorizontal: 20,
     justifyContent: "center",
     alignItems: "center",
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.text,
     marginBottom: 24,
     textAlign: "center",
   },

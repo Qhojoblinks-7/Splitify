@@ -7,6 +7,7 @@ import BaseButton from '../../components/atoms/BaseButton';
 import CustomInput from '../../components/atoms/CustomInput';
 import AuthScreenLayout from '../../components/molecule/AuthScreenLayout';
 import { useSessionStore } from '../../store/session';
+import colors from "../../theme/colors";
 
 /**
  * Sign in against the server.
@@ -63,9 +64,9 @@ export default function Login() {
         keyboardType='phone-pad'
         autoCapitalize='none'
         placeholder='+233 20 000 0000'
-        placeholderTextColor='#797777'
-        borderColor='#797777'
-        iconLeft={<Phone color="#797777" size={20} />}
+        placeholderTextColor={colors.inactive}
+        borderColor={colors.inactive}
+        iconLeft={<Phone color={colors.inactive} size={20} />}
         style={styles.input}
         value={phone}
         onChangeText={(text) => {
@@ -77,10 +78,10 @@ export default function Login() {
       <CustomInput
         label='Password'
         secureTextEntry
-        placeholderTextColor='#797777'
-        iconLeft={<Lock color="#797777" size={20} />}
+        placeholderTextColor={colors.inactive}
+        iconLeft={<Lock color={colors.inactive} size={20} />}
         style={styles.input}
-        borderColor='#797777'
+        borderColor={colors.inactive}
         value={password}
         onChangeText={(text) => {
           clearAuthError();
@@ -95,14 +96,14 @@ export default function Login() {
         </View>
       ) : null}
 
-      {busy ? <ActivityIndicator color='#fbb81c' style={styles.spinner} /> : null}
+      {busy ? <ActivityIndicator color={colors.gold} style={styles.spinner} /> : null}
 
       <View style={styles.RememberMeContainer}>
         <View style={styles.checkboxContainer}>
           <Checkbox
             value={rememberMe}
             onValueChange={setRememberMe}
-            color={rememberMe ? '#fbb81c' : undefined}
+            color={rememberMe ? colors.gold : undefined}
             style={styles.checkboxBorderFix}
           />
           <Text style={styles.checkboxLabel}>Remember Me</Text>
@@ -123,15 +124,15 @@ const styles = StyleSheet.create({
     },
     errorBox: {
         width: '100%',
-        backgroundColor: '#3a1f22',
+        backgroundColor: colors.dangerSoftAlt,
         borderRadius: 10,
         borderLeftWidth: 3,
-        borderLeftColor: '#ef4444',
+        borderLeftColor: colors.danger,
         padding: 12,
         marginBottom: 12,
     },
     errorText: {
-        color: '#ef4444',
+        color: colors.danger,
         fontSize: 13,
         lineHeight: 18,
     },
@@ -151,14 +152,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     checkboxBorderFix: {
-        borderColor: '#fbb81c',
+        borderColor: colors.gold,
         borderWidth: 0.5,
     },
     checkboxLabel: {
         marginLeft: 8,
-        color: '#666666',
+        color: colors.placeholder,
     },
     forgotPassword: {
-        color: '#c2a989',
+        color: colors.textBodyAlt,
     }
 });

@@ -16,11 +16,14 @@ import {
   Phone,
   ShieldCheck,
 } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "../../store/session";
+import { useSecurityStore } from "../../store/security";
 import { useNetworkStore } from "../../store/network";
 import { useQueueStore } from "../../store/queue";
-import { useSusuStore } from "../../store/susu";
 import { initialsOf } from "../../services/susu";
+import { queries } from "../../services/query";
+import colors from "../../theme/colors";
 
 export default function Account() {
   const insets = useSafeAreaInsets();
@@ -30,22 +33,23 @@ export default function Account() {
   const signOut = useSessionStore((s) => s.signOut);
   const notificationsEnabled = useSessionStore((s) => s.notificationsEnabled);
   const setNotificationsEnabled = useSessionStore((s) => s.setNotificationsEnabled);
+  const settings = useSecurityStore();
 
   const isOnline = useNetworkStore((s) => s.isOnline);
   const override = useNetworkStore((s) => s.override);
   const setOverride = useNetworkStore((s) => s.setOverride);
 
   const queued = useQueueStore((s) => s.items.length);
-  const groups = useSusuStore((s) => s.groups);
-  const userId = useSusuStore((s) => s.userId);
 
-  const stats = React.useMemo(() => {
-    const mine = groups.filter((g) => g.members.some((m) => m.id === userId));
-    const adminOf = mine.filter((g) =>
-      g.members.some((m) => m.id === userId && m.role === "admin")
-    );
-    return { total: mine.length, adminOf: adminOf.length };
-  }, [groups, userId]);
+  // The counts are the server's, not a count of rows some
+  // screen happened to keep: how many groups this account
+  // is in, and of those, how many it administers.
+  const { data: summary } = useQuery(queries.memberSummary());
+
+  const stats = {
+    total: summary?.groupCount ?? 0,
+    adminOf: summary?.adminOfCount ?? 0,
+  };
 
   const initials = user?.initials || initialsOf(user?.name || "G");
 
@@ -89,11 +93,11 @@ export default function Account() {
         </View>
 
         <View style={styles.brandCard}>
-          <Text style={styles.brand}>Growl</Text>
+          <Text style={styles.brand}>Ntuboa</Text>
           <Text style={styles.brandTagline}>Grow Your Wealth Together</Text>
           <Text style={styles.brandCopy}>
-            Growl helps your circle save together — fixed weekly contributions, a clear rotation,
-            and no more counting who paid what. Growl keeps the record of your contributions. It
+            Ntuboa helps your circle save together — fixed weekly contributions, a clear rotation,
+            and no more counting who paid what. Ntuboa keeps the record of your contributions. It
             never holds your money.
           </Text>
         </View>
@@ -120,24 +124,32 @@ export default function Account() {
           }
         />
 
+        <SectionLabel>Security</SectionLabel>
+        <MenuItem
+          icon={ShieldCheck}
+          label="App lock"
+          hint={settings.appLockEnabled ? "On" : "Off"}
+          onPress={() => router.push("/Security")}
+        />
+
         <SectionLabel>Notifications</SectionLabel>
         <View style={styles.menuItem}>
           <View style={styles.menuLeft}>
-            <Bell size={20} color="#fbb81c" />
+            <Bell size={20} color={colors.gold} />
             <Text style={styles.menuText}>Turn collection reminders</Text>
           </View>
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
-            trackColor={{ false: "#2a2b30", true: "#4a3a10" }}
-            thumbColor={notificationsEnabled ? "#fbb81c" : "#666666"}
+            trackColor={{ false: colors.borderSubtle, true: colors.goldSoft }}
+            thumbColor={notificationsEnabled ? colors.gold : colors.placeholder}
           />
         </View>
 
         <SectionLabel>Connection</SectionLabel>
         <View style={styles.menuItem}>
           <View style={styles.menuLeft}>
-            <CloudOff size={20} color={isOnline ? "#4ade80" : "#ef4444"} />
+            <CloudOff size={20} color={isOnline ? colors.success : colors.danger} />
             <View>
               <Text style={styles.menuText}>{isOnline ? "Online" : "Offline"}</Text>
               {queued > 0 ? (
@@ -150,8 +162,8 @@ export default function Account() {
           <Switch
             value={override === null ? isOnline : override}
             onValueChange={(next) => setOverride(next)}
-            trackColor={{ false: "#2a2b30", true: "#4a3a10" }}
-            thumbColor={isOnline ? "#4ade80" : "#ef4444"}
+            trackColor={{ false: colors.borderSubtle, true: colors.goldSoft }}
+            thumbColor={isOnline ? colors.success : colors.danger}
           />
         </View>
         <Text style={styles.debugHint}>
@@ -168,14 +180,14 @@ export default function Account() {
         />
         <MenuItem icon={FileText} label="Privacy Policy" onPress={() => router.push("/PrivacyPolicy")} />
         <MenuItem icon={ScrollText} label="Terms of Service" onPress={() => router.push("/TermsOfService")} />
-        <MenuItem icon={Info} label="About Growl" onPress={() => router.push("/AboutUs")} />
+        <MenuItem icon={Info} label="About Ntuboa" onPress={() => router.push("/AboutUs")} />
 
         <TouchableOpacity style={styles.signOut} onPress={onSignOut}>
-          <LogOut size={20} color="#ef4444" />
+          <LogOut size={20} color={colors.danger} />
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Growl v1.0.0</Text>
+        <Text style={styles.version}>Ntuboa v1.0.0</Text>
       </ScrollView>
     </View>
   );
@@ -198,19 +210,19 @@ function MenuItem({ icon: Icon, label, hint, onPress }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <View style={styles.menuLeft}>
-        <Icon size={20} color="#fbb81c" />
+        <Icon size={20} color={colors.gold} />
         <View style={styles.menuTextWrap}>
           <Text style={styles.menuText}>{label}</Text>
           {hint ? <Text style={styles.menuHint}>{hint}</Text> : null}
         </View>
       </View>
-      <ChevronRight size={20} color="#8e8e93" />
+      <ChevronRight size={20} color={colors.textMuted} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#16171b" },
+  container: { flex: 1, backgroundColor: colors.background },
   body: { paddingBottom: 60 },
   profileHeader: {
     flexDirection: "row",
@@ -222,31 +234,31 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarText: { color: "#16171b", fontSize: 22, fontWeight: "800" },
+  avatarText: { color: colors.background, fontSize: 22, fontWeight: "800" },
   profileInfo: { flex: 1, marginLeft: 16 },
-  profileName: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
-  profileEmail: { color: "#8e8e93", fontSize: 14, marginTop: 2 },
+  profileName: { color: colors.text, fontSize: 18, fontWeight: "700" },
+  profileEmail: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
   statRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1e1f24",
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#2a2b30",
+    borderColor: colors.borderSubtle,
     paddingVertical: 16,
     marginHorizontal: 20,
     marginBottom: 20,
   },
   stat: { flex: 1, alignItems: "center", gap: 4 },
-  statValue: { color: "#ffffff", fontSize: 19, fontWeight: "800" },
-  statLabel: { color: "#8e8e93", fontSize: 11 },
-  statDivider: { width: 1, height: 34, backgroundColor: "#2a2b30" },
+  statValue: { color: colors.text, fontSize: 19, fontWeight: "800" },
+  statLabel: { color: colors.textMuted, fontSize: 11 },
+  statDivider: { width: 1, height: 34, backgroundColor: colors.borderSubtle },
   sectionLabel: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1,
@@ -256,9 +268,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   menuTextWrap: { flex: 1 },
-  menuHint: { color: "#8e8e93", fontSize: 12, marginTop: 2 },
+  menuHint: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   debugHint: {
-    color: "#5a5a5e",
+    color: colors.muted2,
     fontSize: 11,
     lineHeight: 16,
     paddingHorizontal: 20,
@@ -267,15 +279,15 @@ const styles = StyleSheet.create({
   brandCard: {
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: "#1e1f24",
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#2a2b30",
+    borderColor: colors.borderSubtle,
     padding: 18,
   },
-  brand: { color: "#ffffff", fontSize: 24, fontWeight: "800" },
-  brandTagline: { color: "#fbb81c", fontSize: 14, fontWeight: "600", marginTop: 2 },
-  brandCopy: { color: "#8e8e93", fontSize: 13, lineHeight: 19, marginTop: 12 },
+  brand: { color: colors.text, fontSize: 24, fontWeight: "800" },
+  brandTagline: { color: colors.gold, fontSize: 14, fontWeight: "600", marginTop: 2 },
+  brandCopy: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 12 },
   menuItem: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -283,10 +295,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#2a2b30",
+    borderBottomColor: colors.borderSubtle,
   },
   menuLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  menuText: { color: "#ffffff", fontSize: 16 },
+  menuText: { color: colors.text, fontSize: 16 },
   signOut: {
     flexDirection: "row",
     alignItems: "center",
@@ -296,9 +308,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ef4444",
+    borderColor: colors.danger,
     paddingVertical: 14,
   },
-  signOutText: { color: "#ef4444", fontSize: 15, fontWeight: "700" },
-  version: { color: "#5a5a5e", fontSize: 12, textAlign: "center", marginTop: 24 },
+  signOutText: { color: colors.danger, fontSize: 15, fontWeight: "700" },
+  version: { color: colors.muted2, fontSize: 12, textAlign: "center", marginTop: 24 },
 });

@@ -7,8 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import GrowlDialog from "../components/molecule/GrowlDialog";
-import GrowlToast from "../components/molecule/GrowlToast";
+import NtuboaDialog from "../components/molecule/NtuboaDialog";
+import NtuboaToast from "../components/molecule/NtuboaToast";
 import { registerFeedbackHandler } from "../utils/alert";
 
 const FeedbackContext = createContext(null);
@@ -97,7 +97,7 @@ export function FeedbackProvider({ children }) {
   return (
     <FeedbackContext.Provider value={value}>
       {children}
-      <GrowlDialog
+      <NtuboaDialog
         visible={Boolean(dialog)}
         title={dialog && dialog.title}
         message={dialog && dialog.message}
@@ -105,7 +105,7 @@ export function FeedbackProvider({ children }) {
         buttons={dialog && dialog.buttons}
         onClose={closeDialog}
       />
-      <GrowlToast toast={active} onExited={removeToast} />
+      <NtuboaToast toast={active} onExited={removeToast} />
     </FeedbackContext.Provider>
   );
 }

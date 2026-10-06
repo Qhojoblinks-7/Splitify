@@ -1,25 +1,23 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { ChevronLeft, Shield, FileText, Database, Share2, Clock, UserCheck, Lock, RefreshCw, Mail, AlertTriangle, Globe } from "lucide-react-native";
+import { ChevronLeft, Mail, AlertTriangle } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { openEmail as openMailClient } from "../utils/openEmail";
 import { fetchNotice, noticeSections, noticeContacts, PRIVACY_CONTACT_EMAIL } from "../services/privacy";
+import colors from "../theme/colors";
 
 /**
  * The privacy notice, fetched from the server rather than typed in here.
  *
- * This screen used to carry a paragraph per section written by nobody in particular, including
- * a claim that the app uses cookies and collects device data — neither of which is true, both of
- * which are the kind of sentence that costs more to explain than to remove. It also said nothing
- * about the one thing a member of a savings group actually needs to know: that the other members
- * of their group can see what they paid, and that we never hold the money.
+ * Rendered as a plain legal document: numbered sections, left-aligned body
+ * text, horizontal rules. No icon tiles or coloured cards — the content must
+ * read like it was written by a lawyer, not dressed up as UI.
  *
- * Act 843 s.27(2) requires nine specific items, and they come from the same module the
- * registration application quotes. One copy, versioned, served to both.
+ * Act 843 s.27(2) requires nine specific items. They come from the same
+ * module the registration application quotes — one copy, versioned, served
+ * to both.
  */
-const ICONS = [Shield, Database, FileText, UserCheck, AlertTriangle, Share2, Globe, Lock, Clock];
-
 export default function PrivacyPolicy() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -35,8 +33,6 @@ export default function PrivacyPolicy() {
       setNotice(await fetchNotice());
       setState("ready");
     } catch (err) {
-      // A notice that cannot be fetched is a support problem, not a licence to show a different
-      // notice. Say so, and give the member the one address that always reaches a person.
       setError(err?.offline ? "We could not reach the server." : "We could not load the notice.");
       setState("failed");
     }
@@ -50,9 +46,14 @@ export default function PrivacyPolicy() {
   const contactEmail = contacts.dpoEmail || PRIVACY_CONTACT_EMAIL;
   const sections = noticeSections(notice);
 
+  const effectiveDate = notice?.effectiveAt ? new Date(notice.effectiveAt).toLocaleDateString() : null;
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={[styles.paper, { paddingTop: insets.top }]}>
+      <ScrollView
+        contentContainerStyle={styles.document}
+        showsVerticalScrollIndicator={false}
+      >
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -60,31 +61,26 @@ export default function PrivacyPolicy() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <ChevronLeft size={28} color="#ffffff" />
+          <ChevronLeft size={24} color={colors.textMuted} />
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Shield size={30} color="#16171b" />
-          </View>
           <Text style={styles.title}>Privacy Notice</Text>
-          {notice?.version ? <Text style={styles.version}>Version {notice.version}</Text> : null}
+          {notice?.version ? <Text style={styles.version}>Version {notice.version} · Effective {effectiveDate}</Text> : null}
+          <View style={styles.rule} />
         </View>
 
-        <View style={styles.introCard}>
-          <Text style={styles.introTitle}>Read this before you join a circle</Text>
-          <Text style={styles.introText}>
-            Growl keeps the record of your contributions. It never holds your money: your payment
-            goes from your mobile money to your group on your operator's rail, and we only write
-            down what happened.
-          </Text>
-        </View>
+        <Text style={styles.lead}>
+          Ntuboa keeps the record of your contributions. It never holds your money: your payment
+          goes from your mobile money to your group on your operator's rail, and we only write down
+          what happened.
+        </Text>
 
-        {state === "loading" ? <ActivityIndicator color="#fbb81c" style={styles.loader} /> : null}
+        {state === "loading" ? <ActivityIndicator color={colors.gold} style={styles.loader} /> : null}
 
         {state === "failed" ? (
-          <View style={styles.errorCard}>
-            <AlertTriangle size={18} color="#ef4444" />
+          <View style={styles.errorBox}>
+            <AlertTriangle size={16} color={colors.danger} />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity onPress={load} accessibilityRole="button">
               <Text style={styles.retry}>Try again</Text>
@@ -93,106 +89,99 @@ export default function PrivacyPolicy() {
         ) : null}
 
         {state === "ready" && notice?.draft ? (
-          <View style={styles.draftCard}>
-            <AlertTriangle size={18} color="#fbb81c" />
-            <Text style={styles.draftText}>
-              This notice is still being completed. Our contact details are being finalised, and
-              anything missing is listed on our website.
+          <View style={[styles.noteBox, styles.noteBoxDraft]}>
+            <AlertTriangle size={16} color={colors.gold} />
+            <Text style={styles.noteBoxText}>
+              This notice is still being completed. Anything missing is listed on our website, and
+              our contact details are being finalised.
             </Text>
           </View>
         ) : null}
 
-        <View style={styles.sectionsList}>
-          {sections.map((section, index) => {
-            const Icon = ICONS[index] || Shield;
-            return (
-              <View key={section.key} style={styles.sectionCard}>
-                <View style={styles.sectionIcon}>
-                  <Icon size={22} color="#16171b" />
-                </View>
-                <View style={styles.sectionCopy}>
-                  <Text style={styles.sectionTitle}>{section.title}</Text>
-                  <Text style={styles.sectionText}>{section.body}</Text>
-                  <Text style={styles.sectionAct}>{section.act}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+        {sections.map((section, index) => (
+          <View key={section.key} style={styles.section}>
+            <Text style={styles.sectionNumber}>{index + 1}</Text>
+            <Text style={styles.sectionHeading}>{section.title}</Text>
+            {section.act ? <Text style={styles.sectionAct}>{section.act}</Text> : null}
+            <Text style={styles.body}>{section.body}</Text>
+          </View>
+        ))}
 
         {notice?.recipients ? (
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionIcon}>
-              <Share2 size={22} color="#16171b" />
-            </View>
-            <View style={styles.sectionCopy}>
-              <Text style={styles.sectionTitle}>Who else sees it</Text>
-              {Object.entries(notice.recipients).map(([who, what]) => (
-                <Text key={who} style={styles.sectionText}>{`${who.replace(/_/g, " ")}. ${what}`}</Text>
-              ))}
-            </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionNumber}>a</Text>
+            <Text style={styles.sectionHeading}>Who else sees it</Text>
+            {Object.entries(notice.recipients).map(([who, what]) => (
+              <View key={who} style={styles.subItem}>
+                <Text style={styles.subHeading}>{who.replace(/_/g, " ")}</Text>
+                <Text style={styles.body}>{what}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
         {notice?.retention ? (
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionIcon}>
-              <Clock size={22} color="#16171b" />
-            </View>
-            <View style={styles.sectionCopy}>
-              <Text style={styles.sectionTitle}>How long we keep it</Text>
-              {Object.entries(notice.retention).map(([what, howLong]) => (
-                <Text key={what} style={styles.sectionText}>{`${what.replace(/_/g, " ")}. ${howLong}`}</Text>
-              ))}
-            </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionNumber}>b</Text>
+            <Text style={styles.sectionHeading}>How long we keep it</Text>
+            {Object.entries(notice.retention).map(([what, howLong]) => (
+              <View key={what} style={styles.subItem}>
+                <Text style={styles.subHeading}>{what.replace(/_/g, " ")}</Text>
+                <Text style={styles.body}>{howLong}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
         {notice?.rights ? (
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionIcon}>
-              <UserCheck size={22} color="#16171b" />
-            </View>
-            <View style={styles.sectionCopy}>
-              <Text style={styles.sectionTitle}>Your rights</Text>
-              {Object.entries(notice.rights).map(([right, text]) => (
-                <Text key={right} style={styles.sectionText}>{`${right.replace(/_/g, " ")}. ${text}`}</Text>
-              ))}
-            </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionNumber}>c</Text>
+            <Text style={styles.sectionHeading}>Your rights</Text>
+            {Object.entries(notice.rights).map(([right, text]) => (
+              <View key={right} style={styles.subItem}>
+                <Text style={styles.subHeading}>{right.replace(/_/g, " ")}</Text>
+                <Text style={styles.body}>{text}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
         {notice?.version ? (
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionIcon}>
-              <RefreshCw size={22} color="#16171b" />
-            </View>
-            <View style={styles.sectionCopy}>
-              <Text style={styles.sectionTitle}>If this notice changes</Text>
-              <Text style={styles.sectionText}>
-                We publish a new version here with a new date, and ask you to agree to it. What you
-                agreed to, and when, is recorded on our side, so we can always show you which
-                version applied.
-              </Text>
-            </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionNumber}>d</Text>
+            <Text style={styles.sectionHeading}>If this notice changes</Text>
+            <Text style={styles.body}>
+              We publish a new version here with a new date, and ask you to agree to it. What you
+              agreed to, and when, is recorded on our side, so we can always show you which version
+              applied.
+            </Text>
           </View>
         ) : null}
 
-        <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>Data protection officer</Text>
-          <Text style={styles.contactText}>{contacts.dpoName}</Text>
-          {contacts.name !== "Growl" ? <Text style={styles.contactText}>{contacts.name}</Text> : null}
+        <View style={styles.rule} />
+
+        <View style={styles.footer}>
+          <Text style={styles.footerHeading}>Data controller</Text>
+          <Text style={styles.footerBody}>{contacts.name}</Text>
           {contacts.registration ? (
-            <Text style={styles.contactText}>DPC registration {contacts.registration}</Text>
+            <Text style={styles.footerBody}>DPC registration {contacts.registration}</Text>
+          ) : null}
+          <Text style={styles.footerBody}>Email: {contacts.email}</Text>
+        </View>
+
+        <View style={[styles.footer, { marginTop: 16 }]}>
+          <Text style={styles.footerHeading}>Data protection officer</Text>
+          {contacts.dpoName !== "Our data protection officer" ? (
+            <Text style={styles.footerBody}>{contacts.dpoName}</Text>
           ) : null}
           <TouchableOpacity
-            style={styles.contactButton}
             onPress={() => openMailClient(contactEmail)}
             accessibilityRole="button"
             accessibilityLabel={`Email the data protection officer at ${contactEmail}`}
+            style={styles.emailLink}
           >
-            <Mail size={18} color="#16171b" />
-            <Text style={styles.contactButtonText}>{contactEmail}</Text>
+            <Mail size={14} color={colors.gold} />
+            <Text style={styles.footerLink}>{contactEmail}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -200,95 +189,158 @@ export default function PrivacyPolicy() {
   );
 }
 
+const SECTION_NUMBER_WIDTH = 32;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#16171b" },
-  scrollContent: { padding: 20, paddingBottom: 48 },
-  backButton: { padding: 4, marginBottom: 20 },
-  header: { alignItems: "center", marginBottom: 28 },
-  headerIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#fbb81c",
-    justifyContent: "center",
-    alignItems: "center",
+  paper: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  document: {
+    paddingHorizontal: 22,
+    paddingBottom: 48,
+  },
+  backButton: {
+    padding: 4,
+    marginBottom: 24,
+    alignSelf: "flex-start",
+  },
+  header: {
+    marginBottom: 28,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  version: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontVariant: ["small-caps"],
+  },
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginVertical: 22,
+    marginLeft: "50%",
+    width: "50%",
+  },
+  lead: {
+    color: colors.textBody,
+    fontSize: 15,
+    lineHeight: 23,
+    marginBottom: 24,
+  },
+  loader: {
+    marginVertical: 20,
+    alignSelf: "center",
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    lineHeight: 19,
+    flexShrink: 1,
+  },
+  retry: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+    marginTop: 4,
+  },
+  noteBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  noteBoxDraft: {
+    paddingHorizontal: 4,
+  },
+  noteBoxText: {
+    color: colors.textBodyAlt,
+    fontSize: 13,
+    lineHeight: 19,
+    flexShrink: 1,
+  },
+  section: {
+    marginBottom: 22,
+  },
+  sectionNumber: {
+    position: "absolute",
+    left: -SECTION_NUMBER_WIDTH,
+    top: 0,
+    width: SECTION_NUMBER_WIDTH,
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.gold,
+    textAlign: "right",
+  },
+  sectionHeading: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "600",
+    marginBottom: 8,
+    paddingLeft: 4,
+  },
+  sectionAct: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontStyle: "italic",
+    marginBottom: 6,
+    paddingLeft: 4,
+  },
+  body: {
+    color: colors.textBody,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  subItem: {
     marginBottom: 14,
+    paddingLeft: 4,
   },
-  title: { color: "#ffffff", fontSize: 28, fontWeight: "bold" },
-  version: { color: "#8e8e93", fontSize: 13, marginTop: 6 },
-  introCard: {
-    backgroundColor: "#2a2b30",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#fbb81c",
+  subHeading: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 2,
   },
-  introTitle: { color: "#fbb81c", fontSize: 13, fontWeight: "bold", textTransform: "uppercase" },
-  introText: { color: "#ffffff", fontSize: 14, lineHeight: 21, marginTop: 8 },
-  loader: { marginVertical: 20 },
-  errorCard: {
-    backgroundColor: "#3a1f22",
-    borderRadius: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: "#ef4444",
-    padding: 14,
-    marginBottom: 16,
-    gap: 8,
+  footer: {
+    marginTop: 4,
+    paddingLeft: 4,
   },
-  errorText: { color: "#ef4444", fontSize: 14 },
-  retry: { color: "#ffffff", fontSize: 14, fontWeight: "700", textDecorationLine: "underline" },
-  draftCard: {
-    backgroundColor: "#2a2b30",
-    borderRadius: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: "#fbb81c",
-    padding: 14,
-    marginBottom: 16,
-    flexDirection: "row",
-    gap: 10,
+  footerHeading: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontVariant: ["small-caps"],
+    marginBottom: 4,
   },
-  draftText: { color: "#c2a989", fontSize: 13, lineHeight: 19, flex: 1 },
-  sectionsList: { gap: 12 },
-  sectionCard: {
-    flexDirection: "row",
-    gap: 14,
-    backgroundColor: "#2a2b30",
-    borderRadius: 16,
-    padding: 16,
+  footerBody: {
+    color: colors.textBodyAlt,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 2,
   },
-  sectionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#fbb81c",
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
+  footerLink: {
+    color: colors.textBodyAlt,
+    fontSize: 13,
+    lineHeight: 19,
+    textDecorationLine: "underline",
   },
-  sectionCopy: { flex: 1 },
-  sectionTitle: { color: "#ffffff", fontSize: 16, fontWeight: "bold", marginBottom: 6 },
-  sectionText: { color: "#8e8e93", fontSize: 14, lineHeight: 21 },
-  sectionAct: { color: "#5a5a5e", fontSize: 11, marginTop: 8 },
-  contactCard: {
-    backgroundColor: "#1e1f24",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#2a2b30",
-    padding: 18,
-    marginTop: 20,
-  },
-  contactTitle: { color: "#ffffff", fontSize: 16, fontWeight: "bold" },
-  contactText: { color: "#8e8e93", fontSize: 14, marginTop: 4 },
-  contactButton: {
-    minHeight: 48,
-    marginTop: 14,
-    borderRadius: 14,
-    backgroundColor: "#fbb81c",
+  emailLink: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    gap: 6,
+    alignSelf: "flex-start",
   },
-  contactButtonText: { color: "#16171b", fontSize: 15, fontWeight: "bold" },
 });

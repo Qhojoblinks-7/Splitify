@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { ChevronLeft, ShieldCheck, Download, Trash2, FileText, Clock, Mail, AlertTriangle } from "lucide-react-native";
+import { ChevronLeft, Download, Trash2, FileText, Clock, Mail, AlertTriangle } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Alert, toast } from "../utils/alert";
@@ -15,21 +15,23 @@ import {
   summariseReport,
   noticeContacts,
   withdrawConsent,
+  RESPONSE_DAYS,
 } from "../services/privacy";
 import { formatGHC } from "../services/money";
+import colors from "../theme/colors";
 
 /**
- * What the member can actually do about their data, from inside the app.
+ * What the member can do about their data, from inside the app.
+ * Rendered as a legal document: numbered items in the margin, plain body text.
  *
- * This screen exists because a data subject right that can only be exercised by emailing an
- * address is a right in theory. Act 843 s.32-35 and s.44 all assume the request is made; none of
- * them say the only way to make it is a letter.
+ * A data subject right that can only be exercised by emailing an address is a
+ * right in theory. Act 843 s.32-35 and s.44 all assume the request is made; none
+ * of them say the only way to make it is a letter.
  *
- * The erasure button does not promise deletion. It says exactly what will happen: the account is
- * anonymised straight away, the group's payment record stays because the other members are
- * entitled to it and the law holds it for seven years. A member who is told "delete" and then
- * finds their history still there has been lied to, and the notice says this before they ask —
- * the screen repeating it is the point.
+ * The erasure button does not promise deletion. It says exactly what will
+ * happen: the account is anonymised straight away, the group's payment record
+ * stays because the other members are entitled to it and the law holds it for
+ * seven years.
  */
 export default function PrivacyRights() {
   const insets = useSafeAreaInsets();
@@ -55,8 +57,6 @@ export default function PrivacyRights() {
     try {
       setContacts(noticeContacts(await fetchNotice()));
     } catch {
-      // The contact block has a default, so a failed notice fetch is not worth an error the
-      // member has to dismiss before reaching the buttons that matter.
     }
     setLoading(false);
   }, []);
@@ -85,7 +85,7 @@ export default function PrivacyRights() {
       const created = await createRequest(kind, "");
       const due = new Date(created.dueAt);
       toast.success(
-        `Sent. We answer within 21 days, by ${due.toLocaleDateString()}.`
+        `Sent. We answer within ${RESPONSE_DAYS} days, by ${due.toLocaleDateString()}.`
       );
       setRequests(await listRequests());
     } catch (err) {
@@ -110,8 +110,8 @@ export default function PrivacyRights() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <View style={[styles.paper, { paddingTop: insets.top }]}>
+      <ScrollView contentContainerStyle={styles.document} showsVerticalScrollIndicator={false}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -119,21 +119,24 @@ export default function PrivacyRights() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <ChevronLeft size={28} color="#ffffff" />
+          <ChevronLeft size={24} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Your privacy</Text>
-        <Text style={styles.subtitle}>
-          Growl keeps the record of your contributions. It never holds your money.
-        </Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Your privacy</Text>
+          <Text style={styles.subtitle}>
+            Ntuboa keeps the record of your contributions. It never holds your money.
+          </Text>
+          <View style={styles.rule} />
+        </View>
 
-        {loading ? <ActivityIndicator color="#fbb81c" style={styles.loader} /> : null}
+        {loading ? <ActivityIndicator color={colors.gold} style={styles.loader} /> : null}
 
         {summary ? (
-          <View style={styles.card}>
-            <View style={styles.cardHead}>
-              <ShieldCheck size={20} color="#fbb81c" />
-              <Text style={styles.cardTitle}>What we hold about you</Text>
+          <View style={styles.block}>
+            <View style={styles.blockHead}>
+              <FileText size={18} color={colors.gold} />
+              <Text style={styles.blockTitle}>What we hold about you</Text>
             </View>
             <Row label="Name" value={summary.name} />
             <Row label="Number" value={summary.phone || "none on file"} />
@@ -154,10 +157,10 @@ export default function PrivacyRights() {
           </View>
         ) : null}
 
-        <View style={styles.card}>
-          <View style={styles.cardHead}>
-            <FileText size={20} color="#fbb81c" />
-            <Text style={styles.cardTitle}>Read the full notice</Text>
+        <View style={styles.block}>
+          <View style={styles.blockHead}>
+            <FileText size={18} color={colors.gold} />
+            <Text style={styles.blockTitle}>Read the full notice</Text>
           </View>
           <Text style={styles.note}>
             Every purpose we have for your data, with its own lawful basis, and who else receives
@@ -172,14 +175,14 @@ export default function PrivacyRights() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHead}>
-            <Download size={20} color="#fbb81c" />
-            <Text style={styles.cardTitle}>Ask us something</Text>
+        <View style={styles.block}>
+          <View style={styles.blockHead}>
+            <Mail size={18} color={colors.gold} />
+            <Text style={styles.blockTitle}>Ask us something</Text>
           </View>
           <Text style={styles.note}>
-            We answer every request in writing within 21 days, and we tell you the date when you
-            send it.
+            We answer every request in writing within {RESPONSE_DAYS} days, and we tell you the
+            date when you send it.
           </Text>
 
           <Action
@@ -194,7 +197,7 @@ export default function PrivacyRights() {
           />
           <Action
             title="Delete my data"
-            hint="Anonymises your account straight away. The group's payment record is kept — it is theirs, and the law holds it for seven years."
+            hint="Anonymises your account straight away. The group's payment history is kept — it is theirs, and the law holds it for seven years."
             danger
             onPress={() =>
               ask(
@@ -211,10 +214,10 @@ export default function PrivacyRights() {
         </View>
 
         {consent?.inForce ? (
-          <View style={styles.card}>
-            <View style={styles.cardHead}>
-              <AlertTriangle size={20} color="#fbb81c" />
-              <Text style={styles.cardTitle}>Your consent</Text>
+          <View style={styles.block}>
+            <View style={styles.blockHead}>
+              <AlertTriangle size={18} color={colors.gold} />
+              <Text style={styles.blockTitle}>Your consent</Text>
             </View>
             <Text style={styles.note}>
               You agreed to version {consent.inForce.noticeVersion}. Withdrawing it does not undo
@@ -230,31 +233,39 @@ export default function PrivacyRights() {
           </View>
         ) : null}
 
-        <View style={styles.card}>
-          <View style={styles.cardHead}>
-            <Clock size={20} color="#fbb81c" />
-            <Text style={styles.cardTitle}>Your requests</Text>
+        <View style={styles.block}>
+          <View style={styles.blockHead}>
+            <Clock size={18} color={colors.gold} />
+            <Text style={styles.blockTitle}>Your requests</Text>
           </View>
           {requests.length === 0 ? (
             <Text style={styles.note}>You have not asked us anything yet.</Text>
           ) : (
             requests.map((row) => (
               <View key={row.id} style={styles.request}>
-                <Text style={styles.requestKind}>{row.kind.replace(/_/g, " ")}</Text>
-                <Text style={styles.requestStatus}>
-                  {row.status}
-                  {row.overdue ? " — overdue" : row.status === "received" ? ` — due ${new Date(row.dueAt).toLocaleDateString()}` : ""}
-                </Text>
-                {row.responseSummary ? <Text style={styles.note}>{row.responseSummary}</Text> : null}
+                <View style={styles.requestHead}>
+                  <Text style={styles.requestKind}>{row.kind.replace(/_/g, " ")}</Text>
+                  <Text style={styles.requestStatus}>
+                    {row.status}
+                    {row.overdue
+                      ? " — overdue"
+                      : row.status === "received"
+                      ? ` — due ${new Date(row.dueAt).toLocaleDateString()}`
+                      : ""}
+                  </Text>
+                </View>
+                {row.responseSummary ? (
+                  <Text style={styles.note}>{row.responseSummary}</Text>
+                ) : null}
               </View>
             ))
           )}
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHead}>
-            <Mail size={20} color="#fbb81c" />
-            <Text style={styles.cardTitle}>Complain</Text>
+        <View style={styles.block}>
+          <View style={styles.blockHead}>
+            <Mail size={18} color={colors.gold} />
+            <Text style={styles.blockTitle}>Complain</Text>
           </View>
           <Text style={styles.note}>
             If we do not answer properly, you can complain to the Data Protection Commission —
@@ -264,6 +275,7 @@ export default function PrivacyRights() {
             style={styles.secondary}
             onPress={() => openMailClient(contacts.dpoEmail)}
             accessibilityRole="button"
+            accessibilityLabel={`Email the data protection officer at ${contacts.dpoEmail}`}
           >
             <Text style={styles.secondaryText}>Email the data protection officer</Text>
           </TouchableOpacity>
@@ -289,7 +301,7 @@ function Action({ title, hint, onPress, danger }) {
       onPress={onPress}
       accessibilityRole="button"
     >
-      {danger ? <Trash2 size={18} color="#ef4444" /> : null}
+      {danger ? <Trash2 size={16} color={colors.danger} /> : null}
       <View style={styles.actionCopy}>
         <Text style={[styles.actionTitle, danger && styles.actionTitleDanger]}>{title}</Text>
         <Text style={styles.actionHint}>{hint}</Text>
@@ -299,50 +311,140 @@ function Action({ title, hint, onPress, danger }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#16171b" },
-  body: { padding: 20, paddingBottom: 48 },
-  backButton: { padding: 4, marginBottom: 16 },
-  title: { color: "#ffffff", fontSize: 26, fontWeight: "bold" },
-  subtitle: { color: "#8e8e93", fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 18 },
-  loader: { marginVertical: 18 },
-  card: {
-    backgroundColor: "#1e1f24",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#2a2b30",
-    padding: 16,
-    marginBottom: 14,
+  paper: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  cardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
-  cardTitle: { color: "#ffffff", fontSize: 16, fontWeight: "bold" },
-  row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5 },
-  rowLabel: { color: "#8e8e93", fontSize: 14 },
-  rowValue: { color: "#ffffff", fontSize: 14, fontWeight: "600", maxWidth: "60%", textAlign: "right" },
-  note: { color: "#8e8e93", fontSize: 13, lineHeight: 19, marginTop: 8 },
-  action: {
+  document: {
+    paddingHorizontal: 22,
+    paddingBottom: 48,
+  },
+  backButton: {
+    padding: 4,
+    marginBottom: 24,
+    alignSelf: "flex-start",
+  },
+  header: {
+    marginBottom: 28,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: colors.textBody,
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 6,
+    marginBottom: 22,
+  },
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginTop: 22,
+  },
+  loader: {
+    marginVertical: 18,
+    alignSelf: "center",
+  },
+  block: {
+    marginBottom: 26,
+  },
+  blockHead: {
     flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#2a2b30",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
   },
-  actionDanger: {},
-  actionCopy: { flex: 1 },
-  actionTitle: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
-  actionTitleDanger: { color: "#ef4444" },
-  actionHint: { color: "#8e8e93", fontSize: 12, lineHeight: 18, marginTop: 3 },
+  blockTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  note: {
+    color: colors.textBody,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  rowLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  rowValue: {
+    color: colors.textBodyAlt,
+    fontSize: 13,
+    fontWeight: "600",
+    maxWidth: "60%",
+    textAlign: "right",
+  },
   secondary: {
     marginTop: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#fbb81c",
-    paddingVertical: 12,
-    alignItems: "center",
+    borderColor: colors.gold,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    alignSelf: "flex-start",
   },
-  secondaryText: { color: "#fbb81c", fontSize: 14, fontWeight: "700" },
-  disabled: { opacity: 0.5 },
-  request: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#2a2b30" },
-  requestKind: { color: "#ffffff", fontSize: 14, fontWeight: "600" },
-  requestStatus: { color: "#c2a989", fontSize: 13, marginTop: 2 },
+  secondaryText: {
+    color: colors.gold,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  action: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  actionDanger: {},
+  actionCopy: {
+    flex: 1,
+  },
+  actionTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  actionTitleDanger: {
+    color: colors.danger,
+  },
+  actionHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  request: {
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  requestHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  requestKind: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  requestStatus: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
 });

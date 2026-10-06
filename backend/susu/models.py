@@ -155,7 +155,7 @@ def allocate(total_pesewas, count, keys):
 
 class SusuGroupManager(models.Manager):
     def create_group(self, *, name, target_pesewas, admin, collection_day=1,
-                     invite_code, description=""):
+                     invite_code, description="", fee_pesewas=0):
         """Create a group with its creator installed at rotation position 1.
 
         Rule G2: the creator is the admin and takes the first slot. Creating the group
@@ -167,6 +167,7 @@ class SusuGroupManager(models.Manager):
             description=description,
             target_pesewas=to_pesewas(target_pesewas),
             collection_day=collection_day,
+            fee_pesewas=to_pesewas(fee_pesewas),
             admin=admin,
             invite_code=invite_code,
         )
@@ -194,6 +195,7 @@ class SusuGroup(models.Model):
 
     target_pesewas = models.BigIntegerField()
     collection_day = models.PositiveSmallIntegerField(default=1)
+    fee_pesewas = models.BigIntegerField(default=0)
 
     cycle = models.PositiveIntegerField(default=1)
     current_round = models.PositiveIntegerField(default=1)
@@ -433,7 +435,7 @@ class Round(models.Model):
     # -- construction ----------------------------------------------------
 
     @classmethod
-    def open_current(cls, group, at=None, fee_pesewas=0):
+    def open_current(cls, group, at=None, fee_pesewas=None):
         """Freeze and persist the current round. Idempotent: an open round is returned."""
         at = at or timezone.now()
         existing = cls.objects.filter(group=group, outcome=cls.Outcome.OPEN).first()
@@ -444,22 +446,11 @@ class Round(models.Model):
         if not roster:
             raise ValidationError("A group needs at least one active member to open a round")
 
-        # The cursor and round number are authoritative in the database, not on whichever
-        # instance the caller happened to be holding. A caller whose copy predates a
-        # completed payout would otherwise open a second round with a number already taken,
-        # and the failure would surface as a unique-constraint error about a race.
         group.refresh_from_db(fields=["current_round", "turn_cursor", "cycle"])
 
-        # Z2: money the previous round collected and never paid out belongs to the group and
-        # reduces what they still owe. Demanding it a second time is the defect this prevents.
-        # The floor keeps a round's target above zero, so a float large enough to cover the
-        # whole next target leaves the remainder on the books instead of being spent by
-        # arithmetic and lost.
         carried = cls._unspent_float(group)
         target = max(1, to_pesewas(group.target_pesewas) - carried)
 
-        # Rotation order from the cursor, so the receiver is first and absorbs the
-        # indivisible cedi in the share allocation.
         ordered = roster[group.turn_cursor % len(roster):] + roster[: group.turn_cursor % len(roster)]
         shares = allocate(target, len(ordered), [m.id for m in ordered])
 
@@ -467,11 +458,6 @@ class Round(models.Model):
             {
                 "membership_id": m.id,
                 "account_id": m.account_id,
-                # `display_name`, never `str(account)`. This snapshot is served to every member
-                # of the group, and the old fallback rendered a member's mobile money number
-                # when they had given no name — a number that can be used to move money, handed
-                # to everyone in the circle. Act 843 s.19 as well: necessary, relevant, and not
-                # excessive does not include broadcasting a number nobody asked to share.
                 "name": m.account.display_name,
                 "order": m.order,
                 "share_pesewas": shares[m.id],
@@ -480,12 +466,14 @@ class Round(models.Model):
             for m in ordered
         ]
 
+        fee = to_pesewas(fee_pesewas if fee_pesewas is not None else group.fee_pesewas)
+
         return cls.objects.create(
             group=group,
             number=group.current_round,
             cycle=group.cycle,
             target_pesewas=target,
-            fee_pesewas=fee_pesewas,
+            fee_pesewas=fee,
             receiver=ordered[0],
             roster_snapshot=snapshot,
             opened_at=at,

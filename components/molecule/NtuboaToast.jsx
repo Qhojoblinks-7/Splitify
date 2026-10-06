@@ -5,17 +5,17 @@ import { CheckCircle2, XCircle, AlertTriangle, Info, Ban } from "lucide-react-na
 import colors from "../../theme/colors";
 
 const VARIANTS = {
-  success: { color: colors.success, Icon: CheckCircle2, tint: "rgba(74, 222, 128, 0.14)" },
-  error: { color: colors.danger, Icon: XCircle, tint: "rgba(239, 68, 68, 0.14)" },
-  warning: { color: colors.warning, Icon: AlertTriangle, tint: "rgba(251, 184, 28, 0.14)" },
-  danger: { color: colors.danger, Icon: Ban, tint: "rgba(239, 68, 68, 0.14)" },
-  info: { color: colors.gold, Icon: Info, tint: "rgba(251, 184, 28, 0.14)" },
-  confirm: { color: colors.gold, Icon: Info, tint: "rgba(251, 184, 28, 0.14)" },
+  success: { color: colors.success, Icon: CheckCircle2, tint: colors.tintSuccess },
+  error: { color: colors.danger, Icon: XCircle, tint: colors.tintDanger },
+  warning: { color: colors.warning, Icon: AlertTriangle, tint: colors.tintGold },
+  danger: { color: colors.danger, Icon: Ban, tint: colors.tintDanger },
+  info: { color: colors.gold, Icon: Info, tint: colors.tintGold },
+  confirm: { color: colors.gold, Icon: Info, tint: colors.tintGold },
 };
 
 const DEFAULT_DURATION = { success: 3200, info: 3200, confirm: 3200, warning: 4000, danger: 4500, error: 4500 };
 
-export default function GrowlToast({ toast, onExited }) {
+export default function NtuboaToast({ toast, onExited }) {
   const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
   const timer = useRef(null);
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 14,

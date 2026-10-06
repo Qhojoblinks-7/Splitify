@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  bannerSync: { backgroundColor: "#7c5a00" },
+  bannerSync: { backgroundColor: colors.warningSoft },
   text: { color: colors.onGold, fontSize: 13, fontWeight: "600", flex: 1 },
   action: { color: colors.gold, fontSize: 13, fontWeight: "800" },
 });

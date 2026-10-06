@@ -163,3 +163,102 @@ describe("failed sign-in", () => {
     );
   });
 });
+
+describe("consent capture at sign-in", () => {
+  const jsonResponse = (payload, status = 200) => ({
+    ok: status < 400,
+    status,
+    text: async () => JSON.stringify(payload),
+  });
+
+  /** Route every call the sign-in flow can make, recording what was sent. */
+  const mockServer = (consentState, noticeVersion = "2026-10-05") => {
+    const requests = [];
+    global.fetch = jest.fn((url, options = {}) => {
+      requests.push({ url, method: options.method, body: options.body, headers: options.headers });
+      if (url.endsWith("/api/auth/token/")) {
+        return Promise.resolve(jsonResponse({ access: "access-1", refresh: "refresh-1" }));
+      }
+      if (url.endsWith("/api/privacy/consent/") && options.method === "POST") {
+        return Promise.resolve(
+          jsonResponse({ consent: { action: "granted", noticeVersion } })
+        );
+      }
+      if (url.endsWith("/api/privacy/consent/")) {
+        return Promise.resolve(
+          jsonResponse({ inForce: null, currentNoticeVersion: noticeVersion, history: [], ...consentState })
+        );
+      }
+      if (url.endsWith("/api/privacy/notice/")) {
+        return Promise.resolve(jsonResponse({ version: noticeVersion, sections: [] }));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    return requests;
+  };
+
+  const signIn = () =>
+    useSessionStore.getState().authenticate({ phone: "+233201000001", password: "password" });
+
+  const consentPosts = (requests) =>
+    requests.filter((r) => r.method === "POST" && r.url.includes("/api/privacy/consent/"));
+
+  afterEach(() => {
+    delete global.fetch;
+  });
+
+  test("records the grant against the served notice version for a member with no consent history", async () => {
+    configureApi({ baseUrl: "http://127.0.0.1:8000", getToken: getAccessToken });
+    const requests = mockServer({});
+
+    const result = await signIn();
+
+    expect(result.ok).toBe(true);
+    const grants = consentPosts(requests);
+    expect(grants).toHaveLength(1);
+    expect(JSON.parse(grants[0].body)).toEqual({ action: "granted", noticeVersion: "2026-10-05" });
+    // The grant is an authenticated act: it carries the session the sign-in just issued.
+    expect(grants[0].headers.Authorization).toBe("Bearer access-1");
+  });
+
+  test("leaves a member whose consent is already in force alone", async () => {
+    configureApi({ baseUrl: "http://127.0.0.1:8000", getToken: getAccessToken });
+    const requests = mockServer({
+      inForce: { noticeVersion: "2026-10-05" },
+      history: [{ action: "granted", noticeVersion: "2026-10-05" }],
+    });
+
+    await signIn();
+
+    expect(consentPosts(requests)).toHaveLength(0);
+  });
+
+  test("does not re-grant consent a member has withdrawn", async () => {
+    configureApi({ baseUrl: "http://127.0.0.1:8000", getToken: getAccessToken });
+    // A withdrawal is a row, not an absence: inForce is null, but the history
+    // holds the choice the member already made.
+    const requests = mockServer({
+      inForce: null,
+      history: [{ action: "withdrawn", noticeVersion: "2026-10-05" }],
+    });
+
+    await signIn();
+
+    expect(consentPosts(requests)).toHaveLength(0);
+  });
+
+  test("signs in even when the consent endpoint is unreachable", async () => {
+    configureApi({ baseUrl: "http://127.0.0.1:8000", getToken: getAccessToken });
+    global.fetch = jest.fn((url) => {
+      if (url.endsWith("/api/auth/token/")) {
+        return Promise.resolve(jsonResponse({ access: "access-1", refresh: "refresh-1" }));
+      }
+      return Promise.reject(new Error("network down"));
+    });
+
+    const result = await signIn();
+
+    expect(result.ok).toBe(true);
+    expect(useSessionStore.getState().isAuthenticated).toBe(true);
+  });
+});

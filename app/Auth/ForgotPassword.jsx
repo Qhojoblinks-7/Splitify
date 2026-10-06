@@ -5,6 +5,7 @@ import CustomInput from '../../components/atoms/CustomInput';
 import { Mail } from 'lucide-react-native';
 import BaseButton from '../../components/atoms/BaseButton';
 import AuthScreenLayout from '../../components/molecule/AuthScreenLayout';
+import colors from "../../theme/colors";
 
 export default function ForgotPassword() {
     const router = useRouter();
@@ -22,9 +23,9 @@ export default function ForgotPassword() {
                 label='Email'
                 keyboardType='email-address'
                 autoCapitalize='none'
-                placeholderTextColor='#797777'
-                borderColor='#797777'
-                iconLeft={<Mail color='#797777' size={20}/>}
+                placeholderTextColor={colors.inactive}
+                borderColor={colors.inactive}
+                iconLeft={<Mail color={colors.inactive} size={20}/>}
             />
         </AuthScreenLayout>
     );

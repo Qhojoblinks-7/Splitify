@@ -4,6 +4,7 @@ import BaseButton from '../../components/atoms/BaseButton';
 import {Lock} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import AuthScreenLayout from '../../components/molecule/AuthScreenLayout';
+import colors from "../../theme/colors";
 
 export default function NewPassword (){
     const router = useRouter();
@@ -19,18 +20,18 @@ export default function NewPassword (){
         >
             <CustomInput
                 label='New Password'
-                iconLeft={<Lock size={20} color='#797777'/>}
+                iconLeft={<Lock size={20} color={colors.inactive}/>}
                 iconRight
                 secureTextEntry
-                borderColor='#797777'
+                borderColor={colors.inactive}
                 />
 
                 <CustomInput
                     label='Confirm New Password'
-                    iconLeft={<Lock size={20} color='#797777'/>}
+                    iconLeft={<Lock size={20} color={colors.inactive}/>}
                     iconRight
                     secureTextEntry
-                    borderColor="#797777"
+                    borderColor={colors.inactive}
                 />
         </AuthScreenLayout>
     )

@@ -1,15 +1,16 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { CheckCircle2, Clock, AlertTriangle, ShieldCheck, XCircle, CloudOff, RotateCw, Scale } from "lucide-react-native";
+import colors from "../../theme/colors";
 
 const STATUS = {
-  verified: { label: "Verified", color: "#4ade80", Icon: CheckCircle2 },
-  pending: { label: "Verifying", color: "#fbb81c", Icon: Clock },
-  queued: { label: "Queued", color: "#fbb81c", Icon: RotateCw },
-  offline: { label: "Saved offline", color: "#a1a1aa", Icon: CloudOff },
-  failed: { label: "Failed", color: "#ef4444", Icon: XCircle },
-  flagged: { label: "Flagged", color: "#ef4444", Icon: AlertTriangle },
-  disputed: { label: "Disputed", color: "#fbb81c", Icon: Scale },
+  verified: { label: "Verified", color: colors.success, Icon: CheckCircle2 },
+  pending: { label: "Verifying", color: colors.gold, Icon: Clock },
+  queued: { label: "Queued", color: colors.gold, Icon: RotateCw },
+  offline: { label: "Saved offline", color: colors.textDisabled, Icon: CloudOff },
+  failed: { label: "Failed", color: colors.danger, Icon: XCircle },
+  flagged: { label: "Flagged", color: colors.danger, Icon: AlertTriangle },
+  disputed: { label: "Disputed", color: colors.gold, Icon: Scale },
 };
 
 /**
@@ -33,14 +34,14 @@ export default function SusuContributionRow({ contribution, memberName, memberIn
 
   return (
     <View style={[styles.row, failed && styles.rowFailed, unsynced && styles.rowUnsynced, disputed && styles.rowDisputed]}>
-      <View style={[styles.avatar, { backgroundColor: avatarColor || "#2a2b30" }]}>
+      <View style={[styles.avatar, { backgroundColor: avatarColor || colors.borderSubtle }]}>
         <Text style={styles.avatarText}>{memberInitials || "?"}</Text>
       </View>
 
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{memberName || "Member"}</Text>
         <View style={styles.subRow}>
-          <ShieldCheck size={12} color="#8e8e93" />
+          <ShieldCheck size={12} color={colors.textMuted} />
           <Text style={styles.ref} numberOfLines={1}>
             {providerLabel} · {contribution.reference}
           </Text>
@@ -75,15 +76,15 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1e1f24",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#2a2b30",
+    borderColor: colors.borderSubtle,
   },
-  rowFailed: { borderColor: "#ef4444", opacity: 0.9 },
-  rowUnsynced: { borderColor: "#4b5563", borderStyle: "dashed" },
-  rowDisputed: { borderColor: "#fbb81c" },
+  rowFailed: { borderColor: colors.danger, opacity: 0.9 },
+  rowUnsynced: { borderColor: colors.borderMuted, borderStyle: "dashed" },
+  rowDisputed: { borderColor: colors.gold },
   avatar: {
     width: 38,
     height: 38,
@@ -92,16 +93,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 12,
   },
-  avatarText: { color: "#16171b", fontSize: 13, fontWeight: "800" },
+  avatarText: { color: colors.background, fontSize: 13, fontWeight: "800" },
   info: { flex: 1 },
-  name: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
+  name: { color: colors.text, fontSize: 15, fontWeight: "600" },
   subRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
-  ref: { color: "#8e8e93", fontSize: 11, flexShrink: 1 },
-  reason: { color: "#ef4444", fontSize: 11, marginTop: 4 },
-  pendingNote: { color: "#8e8e93", fontSize: 11, marginTop: 4, lineHeight: 15 },
-  disputeNote: { color: "#fbb81c", fontSize: 11, marginTop: 4, lineHeight: 15 },
+  ref: { color: colors.textMuted, fontSize: 11, flexShrink: 1 },
+  reason: { color: colors.danger, fontSize: 11, marginTop: 4 },
+  pendingNote: { color: colors.textMuted, fontSize: 11, marginTop: 4, lineHeight: 15 },
+  disputeNote: { color: colors.gold, fontSize: 11, marginTop: 4, lineHeight: 15 },
   right: { alignItems: "flex-end", marginLeft: 10 },
-  amount: { color: "#ffffff", fontSize: 14, fontWeight: "700" },
+  amount: { color: colors.text, fontSize: 14, fontWeight: "700" },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
   statusText: { fontSize: 11, fontWeight: "600" },
 });

@@ -1,10 +1,11 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import colors from "../../theme/colors";
 
 export default function EmptyState({
   icon: Icon,
   iconName = "default",
   iconSize = 64,
-  iconColor = "#33353b",
+  iconColor = colors.border,
   title,
   subtitle,
   actionLabel,
@@ -20,7 +21,7 @@ export default function EmptyState({
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {actionLabel && onAction ? (
         <TouchableOpacity style={styles.actionBtn} onPress={onAction}>
-          {ActionIcon ? <ActionIcon size={20} color="#16171b" /> : null}
+          {ActionIcon ? <ActionIcon size={20} color={colors.background} /> : null}
           <Text style={styles.actionText}>{actionLabel}</Text>
         </TouchableOpacity>
       ) : null}
@@ -40,20 +41,20 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#1e1f24",
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
   },
   title: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 8,
     textAlign: "center",
   },
   subtitle: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 14,
     textAlign: "center",
     marginBottom: 24,
@@ -62,13 +63,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 12,
   },
   actionText: {
-    color: "#16171b",
+    color: colors.background,
     fontSize: 16,
     fontWeight: "600",
   },

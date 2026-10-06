@@ -152,7 +152,7 @@ function ContributeCard({ view, pay, withdraw }) {
       {view.openContributionId ? (
         <>
           <Text style={styles.cardMeta}>
-            You have an attempt marked {mine.openStatus ?? "open"}. It only counts once Growl has
+            You have an attempt marked {mine.openStatus ?? "open"}. It only counts once Ntuboa has
             verified it, and the pot has not moved yet.
           </Text>
           <TouchableOpacity
@@ -230,7 +230,7 @@ function PayForm({ pay, share, reference, busy, roundId }) {
         <Text style={styles.buttonText}>{busy ? "Sending…" : "Log my payment"}</Text>
       </TouchableOpacity>
       <Text style={styles.cardMeta}>
-        This records that you sent it. The pot grows only once Growl verifies the payment against
+        This records that you sent it. The pot grows only once Ntuboa verifies the payment against
         your mobile money reference.
       </Text>
       {localError && <Text style={styles.refusal}>{localError}</Text>}
@@ -283,7 +283,7 @@ function RoundScreen() {
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorTitle}>Could not reach Growl</Text>
+        <Text style={styles.errorTitle}>Could not reach Ntuboa</Text>
         <Text style={styles.errorBody}>
           The round could not be loaded. Nothing has been lost — try again when you have signal.
         </Text>
@@ -420,8 +420,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignSelf: "center",
   },
-  badgePaid: { backgroundColor: "#14532d" },
-  badgePending: { backgroundColor: "#422006" },
+  badgePaid: { backgroundColor: colors.successSoft },
+  badgePending: { backgroundColor: colors.amberSoft },
   badgeUnpaid: { backgroundColor: colors.surfaceAlt },
   badgeText: { color: colors.textBody, fontSize: 11, fontWeight: "700" },
 

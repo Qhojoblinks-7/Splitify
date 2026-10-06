@@ -37,6 +37,7 @@ export const ROUND_STALE_MS = 5000;
  */
 export const queryKeys = {
   groups: () => ["groups"],
+  memberSummary: () => ["member", "summary"],
   currentRound: (groupId) => ["round", "current", groupId],
   round: (roundId) => ["round", roundId],
   auditFeed: (groupId) => ["audit", groupId],
@@ -108,6 +109,20 @@ export const queries = {
     queryFn: () => apiFetch("/api/groups/"),
   }),
 
+  /**
+   * The home tab's whole position in one read: the groups, what has
+   * been paid in and out, what is owed, and which rounds are waiting.
+   *
+   * One endpoint rather than a list plus six counts, because a screen
+   * that fetches them separately can show a hero total from a stale
+   * response beside a due card from a fresh one. The numbers themselves
+   * are the server's arithmetic, never the client's (C-S1).
+   */
+  memberSummary: () => ({
+    queryKey: queryKeys.memberSummary(),
+    queryFn: () => apiFetch("/api/members/me/summary/"),
+  }),
+
   currentRound: (groupId) => ({
     queryKey: queryKeys.currentRound(groupId),
     queryFn: () => apiFetch(`/api/groups/${groupId}/rounds/current/`),
@@ -141,6 +156,9 @@ function settleRound(queryClient, payload) {
   queryClient.invalidateQueries({ queryKey: ANY_ROUND });
   queryClient.invalidateQueries({ queryKey: ["contributions"] });
   queryClient.invalidateQueries({ queryKey: ["audit"] });
+  // Money moved: what the member has paid in, what is waiting on them
+  // and what needs their attention all changed with it.
+  queryClient.invalidateQueries({ queryKey: queryKeys.memberSummary() });
 }
 
 export const mutations = {

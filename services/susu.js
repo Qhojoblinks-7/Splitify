@@ -1,10 +1,12 @@
+import colors from "../theme/colors";
+
 const CURRENT_USER_ID = "u1";
 
 export const MIN_CONTRIBUTION = 1;
 export const MAX_MEMBERS = 50;
 export const MAX_MISSES_BEFORE_REMOVAL = 2;
 
-const AVATAR_COLORS = ["#fbb81c", "#3b82f6", "#10b981", "#f97316", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#ef4444", "#14b8a6"];
+const AVATAR_COLORS = [colors.gold, colors.avatarBlue, colors.avatarGreen, colors.amber, colors.avatarViolet, colors.avatarPink, colors.avatarCyan, colors.avatarLime, colors.danger, colors.avatarTeal];
 
 export const PROVIDERS = [
   { id: "mtn_momo", label: "MTN MoMo", short: "MTN" },

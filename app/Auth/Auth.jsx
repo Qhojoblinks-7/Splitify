@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import GoogleIcon from '../../assets/images/google.svg';
 import BaseButton from '../../components/atoms/BaseButton';
+import colors from "../../theme/colors";
 
 const LOGO_HEIGHT = 52;
 const MAX_LOGO_WIDTH = 180;
@@ -121,7 +122,7 @@ export default function Auth() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#16171b', // Sleek Growl dark canvas background
+    backgroundColor: colors.background, // Sleek Ntuboa dark canvas background
   },
   content: {
     flexGrow: 1,
@@ -136,7 +137,7 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fbb81c',
+    color: colors.gold,
     marginTop: 12,
     marginBottom: 20,
   },
@@ -148,7 +149,7 @@ socialIcon: {
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#ffffff', // High-contrast white text header
+    color: colors.text, // High-contrast white text header
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -172,11 +173,11 @@ socialIcon: {
   orRule: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#3a3b40',
+    backgroundColor: colors.surfaceElevated,
   },
   orText: {
     fontSize: 12,
-    color: '#8a8b90',
+    color: colors.textMutedAlt,
     fontWeight: '600',
     textTransform: 'uppercase',
   },
@@ -186,7 +187,7 @@ socialIcon: {
     marginTop: 24,
   },
   legalText: {
-    color: '#8a8b90',
+    color: colors.textMutedAlt,
     fontSize: 12,
   },
 });

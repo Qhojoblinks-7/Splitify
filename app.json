@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Growl",
-    "slug": "growl",
+    "name": "Ntuboa",
+    "slug": "ntuboa",
     "version": "1.0.0",
-    "scheme": "growl",
+    "scheme": "ntuboa",
     "backgroundColor": "#16171b",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",

@@ -4,6 +4,7 @@ import {useRouter} from 'expo-router'
 import CustomInput from '../../components/atoms/CustomInput';
 import BaseButton from '../../components/atoms/BaseButton';
 import AuthScreenLayout from '../../components/molecule/AuthScreenLayout';
+import colors from "../../theme/colors";
 
 export default function OTP() {
     const router = useRouter();
@@ -64,7 +65,7 @@ const styles = StyleSheet.create({
         marginBottom: 0,
     },
     resend: {
-        color: "#666666",
+        color: colors.placeholder,
         textAlign: "center"
     }
 });

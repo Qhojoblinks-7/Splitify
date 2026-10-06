@@ -2,10 +2,10 @@ import React from "react";
 import { Tabs } from "expo-router";
 import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HandCoins, History, User } from "lucide-react-native";
-import { useSusuStore } from "../../store/susu";
-
-const NEEDS_ATTENTION = new Set(["pending", "failed", "flagged"]);
+import { HandCoins, History, User, Users } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "../../services/query";
+import colors from "../../theme/colors";
 
 const STANDARD_TAB_BAR_HEIGHT = Platform.select({
   ios: 49,
@@ -25,18 +25,14 @@ export function useTabBarHeight() {
 export default function TabLayout() {
   const tabBarHeight = useTabBarHeight();
 
-  // A contribution stuck pending, failed or flagged is the single strongest
-  // retention signal in the product, so it is surfaced on the tab itself.
-  const attentionCount = useSusuStore((s) =>
-    s.groups.reduce(
-      (total, group) =>
-        total +
-        group.contributions.filter(
-          (c) => c.memberId === s.userId && NEEDS_ATTENTION.has(c.status)
-        ).length,
-      0
-    )
-  );
+  // A payment stuck pending, flagged or disputed is the
+  // single strongest retention signal in the product, so it
+  // is surfaced on the tab itself. The count is the
+  // server's: what counts as needing attention is a domain
+  // question (a failed attempt is settled, a flagged one is
+  // not), and the server is the one holding every attempt.
+  const { data: summary } = useQuery(queries.memberSummary());
+  const attentionCount = summary?.attentionCount ?? 0;
 
   const tabIcon =
     (Icon, badge) =>
@@ -55,16 +51,16 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#fbb81c",
-        tabBarInactiveTintColor: "#797777",
+        tabBarActiveTintColor: colors.gold,
+        tabBarInactiveTintColor: colors.inactive,
         tabBarStyle: {
-          backgroundColor: "#16171b",
+          backgroundColor: colors.background,
           borderTopWidth: 0,
           elevation: 0,
           height: tabBarHeight,
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: "bold" },
-        sceneStyle: { backgroundColor: "#16171b" },
+        sceneStyle: { backgroundColor: colors.background },
       }}
     >
       <Tabs.Screen
@@ -72,6 +68,13 @@ export default function TabLayout() {
         options={{
           title: "Susu",
           tabBarIcon: tabIcon(HandCoins),
+        }}
+      />
+      <Tabs.Screen
+        name="groups"
+        options={{
+          title: "Groups",
+          tabBarIcon: tabIcon(Users),
         }}
       />
       <Tabs.Screen
@@ -106,6 +109,6 @@ const styles = {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#ef4444",
+    backgroundColor: colors.danger,
   },
 };

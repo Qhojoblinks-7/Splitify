@@ -54,4 +54,20 @@ export async function signIn({ phone, password }) {
   return { access: session.access, refresh: session.refresh };
 }
 
+/**
+ * Register a new account and receive tokens in one call.
+ *
+ * The server validates the phone number, runs Django's password validators,
+ * creates the Account, and returns JWT tokens. The client stores them and
+ * records consent — the same post-sign-up path `signIn` uses.
+ */
+export async function signUp({ phone, email, password }) {
+  const session = await apiFetch("/api/auth/register/", {
+    method: "POST",
+    body: { phone, email, password },
+  });
+  setAccessToken(session.access);
+  return { access: session.access, refresh: session.refresh };
+}
+
 export { ApiError };

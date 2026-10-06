@@ -7,12 +7,12 @@ const META = {
   verified: { label: "Verified", color: colors.success, Icon: ShieldCheck },
   pending: { label: "Verifying", color: colors.gold, Icon: Clock },
   queued: { label: "Queued", color: colors.gold, Icon: RotateCw },
-  offline: { label: "Saved offline", color: "#a1a1aa", Icon: CloudOff },
+  offline: { label: "Saved offline", color: colors.textDisabled, Icon: CloudOff },
   failed: { label: "Failed", color: colors.danger, Icon: CircleSlash },
   flagged: { label: "Flagged", color: colors.danger, Icon: TriangleAlert },
   processing: { label: "Sending", color: colors.gold, Icon: RotateCw },
   completed: { label: "Paid out", color: colors.success, Icon: ShieldCheck },
-  skipped: { label: "Round skipped", color: "#f97316", Icon: TriangleAlert },
+  skipped: { label: "Round skipped", color: colors.amber, Icon: TriangleAlert },
 };
 
 export function contributionState(contribution) {

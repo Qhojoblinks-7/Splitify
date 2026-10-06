@@ -20,6 +20,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheet from "../components/molecule/BottomSheet";
 import { Alert } from "../utils/alert";
+import colors from "../theme/colors";
 
 const frequentlyAskedQuestions = [
   {
@@ -112,24 +113,24 @@ export default function HelpSupport() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <ChevronLeft size={28} color="#ffffff" />
+          <ChevronLeft size={28} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <HelpCircle size={30} color="#16171b" />
+            <HelpCircle size={30} color={colors.background} />
           </View>
           <Text style={styles.title}>Help & Support</Text>
         </View>
 
         <View style={styles.searchBox}>
-          <Search size={20} color="#8e8e93" />
+          <Search size={20} color={colors.textMuted} />
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
             placeholder="Search help topics"
-            placeholderTextColor="#8e8e93"
+            placeholderTextColor={colors.textMuted}
             accessibilityLabel="Search help topics"
           />
         </View>
@@ -155,7 +156,7 @@ export default function HelpSupport() {
                     <View style={[styles.chevronBox, isExpanded && styles.chevronBoxExpanded]}>
                       <ChevronDown
                         size={18}
-                        color={isExpanded ? "#16171b" : "#8e8e93"}
+                        color={isExpanded ? colors.background : colors.textMuted}
                         style={isExpanded ? styles.expandedChevron : null}
                       />
                     </View>
@@ -173,7 +174,7 @@ export default function HelpSupport() {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Search size={28} color="#8e8e93" />
+            <Search size={28} color={colors.textMuted} />
             <Text style={styles.emptyStateTitle}>No answers found</Text>
             <Text style={styles.emptyStateText}>Try a different search term.</Text>
           </View>
@@ -182,7 +183,7 @@ export default function HelpSupport() {
         <View style={styles.supportCard}>
           <View style={styles.supportCardContent}>
             <View style={styles.supportIcon}>
-              <MessageCircle size={24} color="#16171b" />
+              <MessageCircle size={24} color={colors.background} />
             </View>
             <View style={styles.supportCopy}>
               <Text style={styles.supportTitle}>Still need help?</Text>
@@ -196,7 +197,7 @@ export default function HelpSupport() {
             accessibilityRole="button"
             accessibilityLabel="Send a message to support"
           >
-            <MessageCircle size={18} color="#16171b" />
+            <MessageCircle size={18} color={colors.background} />
             <Text style={styles.contactButtonText}>Send a message</Text>
           </TouchableOpacity>
 
@@ -207,7 +208,7 @@ export default function HelpSupport() {
               accessibilityRole="button"
               accessibilityLabel="Read the privacy policy"
             >
-              <ShieldCheck size={18} color="#fbb81c" />
+              <ShieldCheck size={18} color={colors.gold} />
               <Text style={styles.supportLinkText}>Privacy &amp; data</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -216,7 +217,7 @@ export default function HelpSupport() {
               accessibilityRole="button"
               accessibilityLabel="Email support"
             >
-              <Mail size={18} color="#fbb81c" />
+              <Mail size={18} color={colors.gold} />
               <Text style={styles.supportLinkText}>Email support</Text>
             </TouchableOpacity>
           </View>
@@ -238,7 +239,7 @@ export default function HelpSupport() {
               value={subject}
               onChangeText={setSubject}
               placeholder="What can we help with?"
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={colors.textMuted}
               accessibilityLabel="Support request subject"
             />
           </View>
@@ -250,7 +251,7 @@ export default function HelpSupport() {
               value={message}
               onChangeText={setMessage}
               placeholder="Describe the issue"
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={colors.textMuted}
               multiline
               textAlignVertical="top"
               accessibilityLabel="Support request message"
@@ -274,7 +275,7 @@ export default function HelpSupport() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#16171b",
+    backgroundColor: colors.background,
   },
   scrollContent: {
     padding: 20,
@@ -292,13 +293,13 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 14,
   },
   title: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 28,
     fontWeight: "bold",
   },
@@ -306,19 +307,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#2a2b30",
+    backgroundColor: colors.borderSubtle,
     borderRadius: 14,
     paddingHorizontal: 14,
     marginBottom: 24,
   },
   searchInput: {
     flex: 1,
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 15,
     paddingVertical: 14,
   },
   sectionTitle: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 14,
@@ -327,12 +328,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   faqItem: {
-    backgroundColor: "#2a2b30",
+    backgroundColor: colors.borderSubtle,
     borderRadius: 14,
     padding: 16,
   },
   faqItemExpanded: {
-    borderColor: "#fbb81c",
+    borderColor: colors.gold,
     borderWidth: 1,
   },
   faqQuestionRow: {
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   faqQuestion: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 15,
     fontWeight: "600",
     flex: 1,
@@ -352,12 +353,12 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#16171b",
+    backgroundColor: colors.background,
     justifyContent: "center",
     alignItems: "center",
   },
   chevronBoxExpanded: {
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
   },
   expandedChevron: {
     transform: [{ rotate: "180deg" }],
@@ -367,38 +368,38 @@ const styles = StyleSheet.create({
   },
   faqAnswerDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: "#3a3b40",
+    backgroundColor: colors.surfaceElevated,
     marginBottom: 12,
   },
   faqAnswer: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 14,
     lineHeight: 21,
   },
   emptyState: {
     alignItems: "center",
     paddingVertical: 36,
-    backgroundColor: "#2a2b30",
+    backgroundColor: colors.borderSubtle,
     borderRadius: 14,
   },
   emptyStateTitle: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "600",
     marginTop: 12,
   },
   emptyStateText: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 14,
     marginTop: 4,
   },
   supportCard: {
-    backgroundColor: "#2a2b30",
+    backgroundColor: colors.borderSubtle,
     borderRadius: 18,
     padding: 20,
     marginTop: 28,
     borderWidth: 1,
-    borderColor: "#3a3b40",
+    borderColor: colors.surfaceElevated,
   },
   supportCardContent: {
     flexDirection: "row",
@@ -409,7 +410,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -417,12 +418,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   supportTitle: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 17,
     fontWeight: "bold",
   },
   supportText: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 4,
@@ -430,7 +431,7 @@ const styles = StyleSheet.create({
   contactButton: {
     minHeight: 50,
     borderRadius: 14,
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -438,7 +439,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   contactButtonText: {
-    color: "#16171b",
+    color: colors.background,
     fontSize: 15,
     fontWeight: "bold",
   },
@@ -454,7 +455,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   supportLinkText: {
-    color: "#fbb81c",
+    color: colors.gold,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -464,7 +465,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   sheetDescription: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 14,
     textAlign: "center",
     marginBottom: 4,
@@ -473,17 +474,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   inputLabel: {
-    color: "#8e8e93",
+    color: colors.textMuted,
     fontSize: 14,
     fontWeight: "600",
   },
   input: {
     minHeight: 50,
-    backgroundColor: "#2a2b30",
+    backgroundColor: colors.borderSubtle,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 15,
   },
   messageInput: {
@@ -492,13 +493,13 @@ const styles = StyleSheet.create({
   submitButton: {
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
   },
   submitButtonText: {
-    color: "#16171b",
+    color: colors.background,
     fontSize: 16,
     fontWeight: "bold",
   },

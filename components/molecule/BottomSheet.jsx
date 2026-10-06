@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import colors from "../../theme/colors";
 
 const DEFAULT_MAX_HEIGHT = "92%";
 
@@ -185,7 +186,11 @@ export default function BottomSheet({
 
   return (
     <View style={styles.root} pointerEvents={isOpen ? "box-none" : "none"}>
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+      <Animated.View
+        style={[styles.backdrop, { opacity: backdropOpacity }]}
+        accessibilityViewIsModal={isOpen}
+        importantForAccessibility={isOpen ? "yes" : "no-hide-descendants"}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={requestClose}
@@ -204,6 +209,8 @@ export default function BottomSheet({
           // content scrolls inside it rather than growing without bound.
           isMeasuring ? { maxHeight: heightCeiling } : { height: panelHeight },
         ]}
+        accessibilityViewIsModal={isOpen}
+        importantForAccessibility="yes"
       >
         <View {...panResponder.panHandlers} style={styles.grabberArea}>
           <View style={styles.handle} />
@@ -229,18 +236,18 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#000000",
+    backgroundColor: colors.black,
   },
   sheet: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#16171b",
+    backgroundColor: colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: "hidden",
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -254,14 +261,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#3a3c42",
+    backgroundColor: colors.surfaceRaised,
     alignSelf: "center",
   },
   title: {
     marginTop: 14,
     fontSize: 20,
     fontWeight: "700",
-    color: "#ffffff",
+    color: colors.text,
     textAlign: "center",
   },
   bodyMeasuring: {

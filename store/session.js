@@ -1,10 +1,49 @@
 import { create } from "zustand";
 
 import { initialsOf } from "../services/susu";
-import { ApiError, setAccessToken, signIn as signInRequest } from "../services/auth";
+import { ApiError, setAccessToken, signIn as signInRequest, signUp as signUpRequest } from "../services/auth";
 import { clearTokens, loadTokens, saveTokens } from "../services/tokenStorage";
+import { fetchConsent, fetchNotice, giveConsent } from "../services/privacy";
+import colors from "../theme/colors";
 
-const FALLBACK_AVATAR = "#fbb81c";
+const FALLBACK_AVATAR = colors.gold;
+
+/**
+ * Record the member's consent once, against the notice the server is serving.
+ *
+ * The agreement itself happens where the member reads the notice: the create
+ * account screen refuses to continue until the box is ticked, because Act 843
+ * s.20(1) wants consent before processing, not after. The server cannot tie that
+ * tick to a person until the person has a session, and the only way an account
+ * comes into existence here is by signing in — so the first sign-in is where the
+ * grant is recorded.
+ *
+ * Only a member with no consent history is granted here. A history means the
+ * member has already made a choice, and a withdrawal is a row in that history
+ * rather than an absence of one. A choice already made is not ours to overturn at
+ * login; the member re-grants from the rights screen if they change their mind.
+ *
+ * The version is read from the notice the server serves, never typed here. A
+ * consent recorded against a version nobody is showing is a consent recorded
+ * against the wrong notice, and the version the registration application quotes
+ * has to be the version this recorded.
+ *
+ * A failure here never fails the sign-in. The rights screen reports the consent
+ * position, so a member whose grant did not land is shown it was not recorded
+ * and can grant it by hand.
+ */
+async function recordConsentForFirstSignIn() {
+  try {
+    const consent = await fetchConsent();
+    if (consent?.inForce || consent?.history?.length > 0) return;
+    const notice = await fetchNotice();
+    if (!notice?.version) return;
+    await giveConsent(notice.version);
+  } catch {
+    // Swallowed deliberately: see the doc comment. Sign-in is the thing that
+    // must not break; the rights screen is the place the gap becomes visible.
+  }
+}
 
 /**
  * Who is signed in, and what the API is allowed to do on their behalf.
@@ -95,6 +134,7 @@ export const useSessionStore = create((set, get) => ({
         status: "signedIn",
         authError: null,
       });
+      await recordConsentForFirstSignIn();
       return { ok: true };
     } catch (error) {
       const message =
@@ -105,6 +145,55 @@ export const useSessionStore = create((set, get) => ({
               ? "We could not reach Growl. Check your connection and try again."
               : error.message
           : "Something went wrong signing in.";
+      set({ status: "idle", authError: message, isAuthenticated: false });
+      return { ok: false, message };
+    }
+   },
+
+  /**
+   * Register a new account.
+   *
+   * Mirrors `authenticate` but POSTs to the registration endpoint instead of
+   * the token endpoint. The server validates the phone number and password,
+   * creates the Account, and returns JWT tokens in the same shape. From the
+   * client's perspective, registration and first sign-in are one call.
+   */
+  register: async ({ phone, email, password }) => {
+    set({ status: "signingIn", authError: null });
+
+    try {
+      const session = await signUpRequest({ phone, email, password });
+
+      await saveTokens(session).catch(() => {});
+
+      set({
+        token: session.access,
+        refreshToken: session.refresh,
+        user: {
+          id: null,
+          name: phone,
+          phone,
+          initials: initialsOf(phone),
+          avatarColor: FALLBACK_AVATAR,
+          ghanaCardVerified: false,
+        },
+        isAuthenticated: true,
+        status: "signedIn",
+        authError: null,
+      });
+      await recordConsentForFirstSignIn();
+      return { ok: true };
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.status === 400
+            ? error.message
+            : error.status === 401
+              ? "That phone number and password do not match."
+              : error.offline
+                ? "We could not reach Growl. Check your connection and try again."
+                : error.message
+          : "Something went wrong creating your account.";
       set({ status: "idle", authError: message, isAuthenticated: false });
       return { ok: false, message };
     }

@@ -28,13 +28,14 @@ import secrets
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Sum
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .ledger import AuditEvent, LedgerAccount
-from .models import Contribution, Membership, Round, SusuGroup
+from .models import Contribution, Membership, Payout, Round, SusuGroup
 from compliance.monitoring import evaluate_contribution
 
 # Invite codes exclude 0/O and 1/I. A code is read aloud across a market association and typed
@@ -327,6 +328,7 @@ class GroupSerializer(serializers.Serializer):
     description = serializers.CharField(allow_blank=True)
     targetPesewas = serializers.IntegerField(source="target_pesewas")
     collectionDay = serializers.IntegerField(source="collection_day")
+    feePesewas = serializers.IntegerField(source="fee_pesewas")
     cycle = serializers.IntegerField()
     currentRound = serializers.IntegerField(source="current_round")
     status = serializers.CharField()
@@ -353,6 +355,9 @@ class GroupCreateSerializer(serializers.Serializer):
     collectionDay = serializers.IntegerField(
         source="collection_day", min_value=0, max_value=6, required=False, default=1
     )
+    feePesewas = serializers.IntegerField(
+        source="fee_pesewas", min_value=0, required=False, default=0
+    )
     description = serializers.CharField(
         max_length=500, required=False, allow_blank=True, default=""
     )
@@ -360,6 +365,11 @@ class GroupCreateSerializer(serializers.Serializer):
     def validate_targetPesewas(self, value):
         if value > 10 ** 12:
             raise serializers.ValidationError("That target is larger than any group we accept")
+        return value
+
+    def validate_feePesewas(self, value):
+        if value > 10 ** 12:
+            raise serializers.ValidationError("That fee is larger than any group we accept")
         return value
 
 
@@ -732,6 +742,28 @@ class GroupJoinView(APIView):
         return Response(GroupSerializer(group).data, status=status.HTTP_201_CREATED)
 
 
+def group_payload(group):
+    """One group, as the group list and the member summary both show it.
+
+    One function rather than two inline dicts, because two copies of a
+    payload shape is a payload shape that drifts: the home tab reads the
+    summary, the groups screen reads the list, and a field added to one
+    and not the other is a screen showing a stale contract.
+    """
+    return {
+        "id": group.id,
+        "name": group.name,
+        "targetPesewas": group.target_pesewas,
+        "collectionDay": group.collection_day,
+        "cycle": group.cycle,
+        "currentRound": group.current_round,
+        "inviteCode": group.invite_code,
+        "rounds": RoundSummarySerializer(
+            group.rounds.order_by("-number")[:5], many=True
+        ).data,
+    }
+
+
 class GroupListView(APIView):
     """`GET /api/groups/` — the groups this account belongs to, and nothing else."""
 
@@ -741,21 +773,116 @@ class GroupListView(APIView):
         groups = SusuGroup.objects.filter(
             memberships__account=request.user, memberships__active=True
         ).distinct()
-        return Response([
-            {
-                "id": group.id,
-                "name": group.name,
-                "targetPesewas": group.target_pesewas,
-                "collectionDay": group.collection_day,
-                "cycle": group.cycle,
-                "currentRound": group.current_round,
-                "inviteCode": group.invite_code,
-                "rounds": RoundSummarySerializer(
-                    group.rounds.order_by("-number")[:5], many=True
-                ).data,
-            }
-            for group in groups
-        ])
+        return Response([group_payload(group) for group in groups])
+
+
+class MemberSummaryView(APIView):
+    """`GET /api/members/me/summary/` — the caller's whole position, once.
+
+    The home tab needs numbers the group list does not carry: what a
+    member has paid in, what has been paid out to them, what they still
+    owe, which rounds are waiting on them, and how many of their
+    attempts need attention. Every one of those is a question about
+    money, so every one is answered here rather than added up on a
+    phone from a list of groups — a total the client computes itself is
+    a total the server never agreed to (C-S1).
+
+    `due` asks the same question the round screen answers, through the
+    same methods: a round is waiting on this member when it is open,
+    they hold no unsettled attempt, and nothing of theirs has been
+    verified into it. A pending attempt is in flight, not due; a
+    verified payment is paid, not due.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        memberships = Membership.objects.filter(
+            account=request.user, active=True
+        ).select_related("group")
+
+        groups = []
+        pot_total = 0
+        admin_of = 0
+        for membership in memberships:
+            group = membership.group
+            if group.status != SusuGroup.Status.ACTIVE:
+                continue
+            pot_total += group.target_pesewas
+            if membership.role == Membership.Role.ADMIN:
+                admin_of += 1
+            payload = group_payload(group)
+            payload["myRole"] = membership.role
+            groups.append(payload)
+
+        contributed = (
+            Contribution.objects.filter(
+                membership__account=request.user,
+                status=Contribution.Status.VERIFIED,
+            ).aggregate(total=Sum("amount_pesewas"))["total"]
+            or 0
+        )
+
+        received = (
+            Payout.objects.filter(
+                receiver__account=request.user,
+                status=Payout.Status.COMPLETED,
+            ).aggregate(total=Sum("amount_pesewas"))["total"]
+            or 0
+        )
+
+        debt = memberships.aggregate(total=Sum("debt_pesewas"))["total"] or 0
+
+        # Pending and queued attempts are the ones a member is waiting on
+        # themselves; flagged and disputed are the ones a group is waiting
+        # on an admin for. Failed, void and reversed are settled, and
+        # verified is done — none of those needs a member's eye.
+        attention = Contribution.objects.filter(
+            membership__account=request.user,
+            status__in=[
+                Contribution.Status.PENDING,
+                Contribution.Status.QUEUED,
+                Contribution.Status.FLAGGED,
+                Contribution.Status.DISPUTED,
+            ],
+        ).count()
+
+        due = []
+        for membership in memberships:
+            group = membership.group
+            if group.status != SusuGroup.Status.ACTIVE:
+                continue
+            round_ = Round.objects.filter(
+                group=group, outcome=Round.Outcome.OPEN
+            ).first()
+            if round_ is None:
+                continue
+            if round_.open_slot_for(membership) is not None:
+                continue
+            if round_.paid_pesewas_for(membership) > 0:
+                continue
+            due.append({
+                "groupId": group.id,
+                "groupName": group.name,
+                "roundId": round_.id,
+                "roundNumber": round_.number,
+                "dueAt": round_.due_at,
+                "sharePesewas": round_.share_for(membership) or 0,
+            })
+        due.sort(key=lambda entry: entry["dueAt"])
+
+        return Response({
+            "groupCount": memberships.count(),
+            "activeGroupCount": len(groups),
+            "adminOfCount": admin_of,
+            "potTotalPesewas": pot_total,
+            "contributedPesewas": contributed,
+            "receivedPesewas": received,
+            "debtPesewas": debt,
+            "attentionCount": attention,
+            "due": due,
+            "groups": groups,
+        })
 
 
 class GroupCreateView(GroupListView):
@@ -789,6 +916,7 @@ class GroupCreateView(GroupListView):
                     description=data["description"],
                     target_pesewas=data["target_pesewas"],
                     collection_day=data["collection_day"],
+                    fee_pesewas=data.get("fee_pesewas", 0),
                     admin=request.user,
                     invite_code=generate_invite_code(),
                 )

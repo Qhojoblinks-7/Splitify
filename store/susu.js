@@ -17,16 +17,17 @@ import {
   normalizeInviteCode,
 } from "../services/susu";
 import { canDispute, canAdminResolve, hasOpenDispute, memberOwedAfterResolution } from "../services/dispute";
+import colors from "../theme/colors";
 
 const now = Date.now();
 const DAY = 86400000;
 
 const seedMembers = [
-  makeMember({ id: "u1", name: "John Doe", phone: "+233 244 123 567", role: "admin", order: 0, avatarColor: "#fbb81c" }),
-  makeMember({ id: "u2", name: "Ama Boateng", phone: "+233 244 123 4567", order: 1, avatarColor: "#3b82f6" }),
-  makeMember({ id: "u3", name: "Kofi Mensah", phone: "+233 244 555 9876", order: 2, avatarColor: "#10b981" }),
-  makeMember({ id: "u4", name: "Sarah Johnson", phone: "+233 244 555 4321", order: 3, avatarColor: "#8b5cf6" }),
-  makeMember({ id: "u5", name: "Kwame Asante", phone: "+233 244 555 1357", order: 4, avatarColor: "#f97316", missedStreak: 1, missedShare: 100 }),
+  makeMember({ id: "u1", name: "John Doe", phone: "+233 244 123 567", role: "admin", order: 0, avatarColor: colors.gold }),
+  makeMember({ id: "u2", name: "Ama Boateng", phone: "+233 244 123 4567", order: 1, avatarColor: colors.avatarBlue }),
+  makeMember({ id: "u3", name: "Kofi Mensah", phone: "+233 244 555 9876", order: 2, avatarColor: colors.avatarGreen }),
+  makeMember({ id: "u4", name: "Sarah Johnson", phone: "+233 244 555 4321", order: 3, avatarColor: colors.avatarViolet }),
+  makeMember({ id: "u5", name: "Kwame Asante", phone: "+233 244 555 1357", order: 4, avatarColor: colors.amber, missedStreak: 1, missedShare: 100 }),
 ];
 
 const seedGroups = [
@@ -48,6 +49,7 @@ const seedGroups = [
     adminTrustScore: 100,
     flaggedTotal: 0,
     inviteCode: "MK7QW2",
+    fee: 25,
     members: seedMembers,
     contributions: [
       { id: "c1", roundNumber: 1, memberId: "u1", amount: 120, provider: "mtn_momo", reference: "MP260114.0932", status: "verified", paidAt: now - DAY * 34, verifiedAt: now - DAY * 34 },
@@ -86,10 +88,11 @@ const seedGroups = [
     adminTrustScore: 100,
     flaggedTotal: 0,
     inviteCode: "FAM304",
+    fee: 10,
     members: [
-      makeMember({ id: "u1", name: "John Doe", phone: "+233 244 123 567", role: "admin", order: 0, avatarColor: "#fbb81c" }),
-      makeMember({ id: "u6", name: "Ama Aboagye", phone: "+233 244 555 2468", order: 1, avatarColor: "#ec4899" }),
-      makeMember({ id: "u7", name: "Daniel Osei", phone: "+233 244 555 1111", order: 2, avatarColor: "#14b8a6" }),
+      makeMember({ id: "u1", name: "John Doe", phone: "+233 244 123 567", role: "admin", order: 0, avatarColor: colors.gold }),
+      makeMember({ id: "u6", name: "Ama Aboagye", phone: "+233 244 555 2468", order: 1, avatarColor: colors.avatarPink }),
+      makeMember({ id: "u7", name: "Daniel Osei", phone: "+233 244 555 1111", order: 2, avatarColor: colors.avatarTeal }),
     ],
     contributions: [
       { id: "d1", roundNumber: 1, memberId: "u6", amount: 100, provider: "mtn_momo", reference: "MP260201.5512", status: "verified", paidAt: now - DAY * 1, verifiedAt: now - DAY * 1 },
@@ -147,7 +150,7 @@ export const useSusuStore = create((set, get) => ({
         phone: draft.adminPhone || "",
         role: "admin",
         order: 0,
-        avatarColor: "#fbb81c",
+        avatarColor: colors.gold,
       }),
       ...draft.members.map((m, index) =>
         makeMember({
@@ -171,6 +174,7 @@ export const useSusuStore = create((set, get) => ({
       currentTurnIndex: 0,
       cycle: 1,
       collectionDay: Number.isInteger(draft.collectionDay) ? draft.collectionDay : 1,
+      fee: Number.isFinite(Number(draft.fee)) ? Number(draft.fee) : 0,
       cycleStartedAt,
       currentRoundDueAt: null,
       isActive: true,
@@ -516,6 +520,7 @@ export const useSusuStore = create((set, get) => ({
       roundNumber: group.currentRound,
       memberId: receiver.id,
       amount: group.targetAmount,
+      fee: group.fee || 0,
       status: "processing",
       reference: `PAY${Date.now().toString().slice(-8)}`,
       startedAt: Date.now(),

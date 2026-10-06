@@ -4,18 +4,18 @@ import { CheckCircle2, XCircle, AlertTriangle, Info, Ban } from "lucide-react-na
 import colors from "../../theme/colors";
 
 const VARIANTS = {
-  success: { color: colors.success, Icon: CheckCircle2, tint: "rgba(74, 222, 128, 0.14)" },
-  error: { color: colors.danger, Icon: XCircle, tint: "rgba(239, 68, 68, 0.14)" },
-  warning: { color: colors.warning, Icon: AlertTriangle, tint: "rgba(251, 184, 28, 0.14)" },
-  danger: { color: colors.danger, Icon: Ban, tint: "rgba(239, 68, 68, 0.14)" },
-  info: { color: colors.gold, Icon: Info, tint: "rgba(251, 184, 28, 0.14)" },
-  confirm: { color: colors.gold, Icon: Info, tint: "rgba(251, 184, 28, 0.14)" },
+  success: { color: colors.success, Icon: CheckCircle2, tint: colors.tintSuccess },
+  error: { color: colors.danger, Icon: XCircle, tint: colors.tintDanger },
+  warning: { color: colors.warning, Icon: AlertTriangle, tint: colors.tintGold },
+  danger: { color: colors.danger, Icon: Ban, tint: colors.tintDanger },
+  info: { color: colors.gold, Icon: Info, tint: colors.tintGold },
+  confirm: { color: colors.gold, Icon: Info, tint: colors.tintGold },
 };
 
 const CANCEL = "cancel";
 const DESTRUCTIVE = "destructive";
 
-export default function GrowlDialog({ visible, title, message, variant = "info", buttons, onClose }) {
+export default function NtuboaDialog({ visible, title, message, variant = "info", buttons, onClose }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
   const [rendered, setRendered] = useState(visible);
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     paddingTop: 26,
     paddingBottom: 20,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.5,
     shadowRadius: 26,

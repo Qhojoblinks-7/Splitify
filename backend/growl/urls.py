@@ -20,6 +20,7 @@ from compliance.api import (
     PrivacyRequestListCreateView,
     PublicNoticeView,
 )
+from accounts.views import RegisterView
 from susu.api import (
     ContributionCreateView,
     ContributionTransitionView,
@@ -28,16 +29,20 @@ from susu.api import (
     GroupCreateView,
     GroupJoinView,
     GroupListView,
+    MemberSummaryView,
     RoundDetailView,
 )
 
 urlpatterns = [
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/register/", RegisterView.as_view(), name="auth-register"),
 
     path("api/groups/", GroupCreateView.as_view(), name="group-list"),
     path("api/groups/", GroupCreateView.as_view(), name="group-create"),
     path("api/groups/join/", GroupJoinView.as_view(), name="group-join"),
+    path("api/members/me/summary/", MemberSummaryView.as_view(),
+         name="member-summary"),
     path("api/groups/<int:group_id>/rounds/current/", CurrentRoundView.as_view(),
          name="current-round"),
     path("api/groups/<int:group_id>/audit/", GroupAuditFeedView.as_view(),

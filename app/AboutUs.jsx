@@ -1,32 +1,12 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-import { ChevronLeft, Info, Users, ShieldCheck, Heart, Globe, Mail } from "lucide-react-native";
+import { ChevronLeft, Mail } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { openEmail } from "../utils/openEmail";
+import colors from "../theme/colors";
 
-const supportEmail = "support@growl.app";
-
-const values = [
-  {
-    id: "simple",
-    title: "Simple",
-    text: "Start a susu group and start collecting in minutes, with no paper records.",
-    icon: Heart,
-  },
-  {
-    id: "transparent",
-    title: "Transparent",
-    text: "Every contribution, reference, and payout stays visible to the whole group.",
-    icon: Info,
-  },
-  {
-    id: "secure",
-    title: "Secure",
-    text: "Verified mobile money references before any pot is released.",
-    icon: ShieldCheck,
-  },
-];
+const supportEmail = "support@ntuboa.app";
 
 export default function AboutUs() {
   const insets = useSafeAreaInsets();
@@ -35,8 +15,8 @@ export default function AboutUs() {
   const openSupportEmail = () => openEmail(supportEmail);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={[styles.paper, { paddingTop: insets.top }]}>
+      <ScrollView contentContainerStyle={styles.document} showsVerticalScrollIndicator={false}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -44,63 +24,71 @@ export default function AboutUs() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <ChevronLeft size={28} color="#ffffff" />
+          <ChevronLeft size={24} color={colors.textMuted} />
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Info size={30} color="#16171b" />
-          </View>
-          <Text style={styles.title}>About Growl</Text>
+          <Text style={styles.title}>About Ntuboa</Text>
+          <Text style={styles.version}>Version 1.0</Text>
+          <View style={styles.rule} />
         </View>
 
-        <View style={styles.missionCard}>
-          <Text style={styles.missionTitle}>Our mission</Text>
-          <Text style={styles.missionText}>
-            Growl helps market associations, family circles, colleagues, and youth groups save
+        <View style={styles.section}>
+          <Text style={styles.sectionNumber}>1</Text>
+          <Text style={styles.sectionHeading}>Our mission</Text>
+          <Text style={styles.body}>
+            Ntuboa helps market associations, family circles, colleagues, and youth groups save
             together with confidence. We make it easy to start a susu group, collect weekly
             contributions, and pay the full pot to each member in turn.
           </Text>
         </View>
 
-        <Text style={styles.sectionHeading}>What we believe</Text>
-        <View style={styles.valuesList}>
-          {values.map((value) => {
-            const Icon = value.icon;
-
-            return (
-              <View key={value.id} style={styles.valueCard}>
-                <View style={styles.valueIcon}>
-                  <Icon size={22} color="#16171b" />
-                </View>
-                <View style={styles.valueCopy}>
-                  <Text style={styles.valueTitle}>{value.title}</Text>
-                  <Text style={styles.valueText}>{value.text}</Text>
-                </View>
-              </View>
-            );
-          })}
+        <View style={styles.section}>
+          <Text style={styles.sectionNumber}>2</Text>
+          <Text style={styles.sectionHeading}>What we believe</Text>
+          <View style={styles.subItem}>
+            <Text style={styles.subHeading}>Simple</Text>
+            <Text style={styles.body}>
+              Start a susu group and start collecting in minutes, with no paper records.
+            </Text>
+          </View>
+          <View style={styles.subItem}>
+            <Text style={styles.subHeading}>Transparent</Text>
+            <Text style={styles.body}>
+              Every contribution, reference, and payout stays visible to the whole group.
+            </Text>
+          </View>
+          <View style={styles.subItem}>
+            <Text style={styles.subHeading}>Secure</Text>
+            <Text style={styles.body}>
+              Verified mobile money references before any pot is released.
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.storyCard}>
-          <Users size={24} color="#fbb81c" style={styles.storyIcon} />
-          <Text style={styles.storyTitle}>Built for real savings circles</Text>
-          <Text style={styles.storyText}>
-            Growl was created to take group susu out of the notebook and into the app, where the
-            rotation, the pot, and every cedi contributed can be seen by everyone at once.
-            Our goal is simple: grow your wealth together.
+        <View style={styles.section}>
+          <Text style={styles.sectionNumber}>3</Text>
+          <Text style={styles.sectionHeading}>Built for real savings circles</Text>
+          <Text style={styles.body}>
+            Ntuboa was created to take group susu out of the notebook and into the app, where the
+            rotation, the pot, and every cedi contributed can be seen by everyone at once. Our
+            goal is simple: grow your wealth together.
           </Text>
         </View>
 
-        <View style={styles.contactCard}>
-          <Globe size={22} color="#fbb81c" />
-          <View style={styles.contactCopy}>
-            <Text style={styles.contactTitle}>Questions or ideas?</Text>
-            <Text style={styles.contactText}>We would love to hear from you.</Text>
-          </View>
-          <TouchableOpacity style={styles.contactButton} onPress={openSupportEmail}>
-            <Mail size={17} color="#16171b" />
-            <Text style={styles.contactButtonText}>Email us</Text>
+        <View style={styles.rule} />
+
+        <View style={styles.contact}>
+          <Text style={styles.contactHeading}>Questions or ideas?</Text>
+          <Text style={styles.note}>We would love to hear from you.</Text>
+          <TouchableOpacity
+            style={styles.contactLink}
+            onPress={openSupportEmail}
+            accessibilityRole="button"
+            accessibilityLabel="Email support"
+          >
+            <Mail size={14} color={colors.gold} />
+            <Text style={styles.contactLinkText}>{supportEmail}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -108,153 +96,101 @@ export default function AboutUs() {
   );
 }
 
+const SECTION_NUMBER_WIDTH = 32;
+
 const styles = StyleSheet.create({
-  container: {
+  paper: {
     flex: 1,
-    backgroundColor: "#16171b",
+    backgroundColor: colors.background,
   },
-  scrollContent: {
-    padding: 20,
+  document: {
+    paddingHorizontal: 22,
     paddingBottom: 48,
   },
   backButton: {
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 24,
+    alignSelf: "flex-start",
   },
   header: {
-    alignItems: "center",
     marginBottom: 28,
   },
-  headerIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#fbb81c",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 14,
-  },
   title: {
-    color: "#ffffff",
+    color: colors.text,
     fontSize: 28,
-    fontWeight: "bold",
-  },
-  missionCard: {
-    backgroundColor: "#2a2b30",
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 26,
-    borderWidth: 1,
-    borderColor: "#fbb81c",
-  },
-  missionTitle: {
-    color: "#fbb81c",
-    fontSize: 14,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  missionText: {
-    color: "#ffffff",
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 10,
-  },
-  sectionHeading: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 14,
-  },
-  valuesList: {
-    gap: 12,
-    marginBottom: 26,
-  },
-  valueCard: {
-    flexDirection: "row",
-    gap: 14,
-    backgroundColor: "#2a2b30",
-    borderRadius: 16,
-    padding: 16,
-  },
-  valueIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#fbb81c",
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  valueCopy: {
-    flex: 1,
-  },
-  valueTitle: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
+    letterSpacing: -0.3,
     marginBottom: 4,
   },
-  valueText: {
-    color: "#8e8e93",
-    fontSize: 14,
-    lineHeight: 21,
+  version: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontVariant: ["small-caps"],
   },
-  storyCard: {
-    backgroundColor: "#2a2b30",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 20,
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginVertical: 22,
   },
-  storyIcon: {
-    marginBottom: 10,
+  section: {
+    position: "relative",
+    paddingLeft: SECTION_NUMBER_WIDTH + 8,
+    marginBottom: 22,
   },
-  storyTitle: {
-    color: "#ffffff",
+  sectionNumber: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: SECTION_NUMBER_WIDTH,
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.gold,
+    textAlign: "right",
+  },
+  sectionHeading: {
+    color: colors.text,
     fontSize: 17,
-    fontWeight: "bold",
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  body: {
+    color: colors.textBody,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  subItem: {
+    marginBottom: 14,
+  },
+  subHeading: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  contact: {
+    marginTop: 8,
+  },
+  contactHeading: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontVariant: ["small-caps"],
+    marginBottom: 4,
+  },
+  note: {
+    color: colors.textBody,
+    fontSize: 13,
+    lineHeight: 20,
     marginBottom: 6,
   },
-  storyText: {
-    color: "#8e8e93",
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  contactCard: {
+  contactLink: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#16171b",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#3a3b40",
-  },
-  contactCopy: {
-    flex: 1,
-  },
-  contactTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "bold",
-  },
-  contactText: {
-    color: "#8e8e93",
-    fontSize: 13,
-    marginTop: 2,
-  },
-  contactButton: {
-    minHeight: 40,
-    borderRadius: 10,
-    backgroundColor: "#fbb81c",
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     gap: 6,
+    alignSelf: "flex-start",
   },
-  contactButtonText: {
-    color: "#16171b",
+  contactLinkText: {
+    color: colors.textBodyAlt,
     fontSize: 13,
-    fontWeight: "bold",
+    textDecorationLine: "underline",
   },
 });

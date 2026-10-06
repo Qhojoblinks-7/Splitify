@@ -1,4 +1,5 @@
 import React from "react";
+import colors from "../../theme/colors";
 import {
   Pressable,
   Text,
@@ -50,7 +51,7 @@ export default function BaseButton({
       <View style={styles.contentRow}>
         {isLoading ? (
           <ActivityIndicator
-            color={variant === "primary" ? "#0f0f0f" : "#fbb81c"}
+            color={variant === "primary" ? colors.canvas : colors.gold}
           />
         ) : (
           <>
@@ -86,30 +87,30 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   primaryButton: {
-    backgroundColor: "#fbb81c",
+    backgroundColor: colors.gold,
   },
   outlineButton: {
-    backgroundColor: "#0f0f0f",
+    backgroundColor: colors.canvas,
     borderWidth: 1,
-    borderColor: "#fbb81c",
+    borderColor: colors.gold,
   },
   secondaryButton: {
-    backgroundColor: "#222327", // Your slate gray block
+    backgroundColor: colors.surfaceAlt, // Your slate gray block
     borderWidth: 1, // Added border width so your color shows up cleanly
-    borderColor: "#bbbab7",
+    borderColor: colors.divider,
   },
   text: {
     fontSize: 16,
     fontWeight: "bold",
   },
   primaryText: {
-    color: "#0f0f0f",
+    color: colors.canvas,
   },
   outlineText: {
-    color: "#ffffff",
+    color: colors.text,
   },
   secondaryText: {
-    color: "#ffffff", // High-contrast white label text to pop off the secondary dark slate
+    color: colors.text, // High-contrast white label text to pop off the secondary dark slate
   },
   fullwidth: {
     alignSelf: "stretch",
