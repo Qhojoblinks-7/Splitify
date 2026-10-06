@@ -11,6 +11,7 @@ held only in Python is a rule a migration or a psql session will eventually walk
 """
 
 import uuid
+from collections import defaultdict
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
@@ -297,6 +298,74 @@ class Membership(models.Model):
     def __str__(self):
         return f"{self.account} in {self.group} at {self.order}"
 
+    class DebtDisposition(models.TextChoices):
+        """The only two honest answers to "what happens to this member's debt on removal."
+
+        We hold no money and have no way to collect, so the choice is about the *record*, not
+        the cedi. `FORGIVE` posts a balanced reversal and keeps the charge in the audit trail;
+        `PRESERVE` leaves the debt intact and it reappears if the member rejoins. There is
+        deliberately no silent third option: a removal without a stated disposition would hide
+        a real group exposure or a real write-off.
+        """
+        FORGIVE = "forgive"
+        PRESERVE = "preserve"
+
+    @transaction.atomic
+    def deactivate(self, *, actor=None, reason="", forgive_debt=True):
+        """Remove this member from rotation, and decide explicitly what happens to their debt.
+
+        Tombstoning `active` drops the member from the next round without renumbering the
+        rotation, so who was about to receive the pot does not change (T1). That is the only
+        effect unless the caller also states a debt disposition:
+
+            forgive_debt=True   the debt was a claim nobody could ever collect, so it is
+                                written off as a balanced ledger reversal and the books stay
+                                honest. The write-off itself is recorded so the group can still
+                                see its pot was short before this member left.
+            forgive_debt=False  the debt stays on the books and survives the departure; if the
+                                member rejoins it is applied, and it always counts against any
+                                future payout they would receive.
+
+        A member is never anonymised or deleted here. Anonymisation is the separate, two-stage
+        path in `compliance.retention` (anonymise now on an erasure request, hard-delete later
+        once the seven-year hold has passed and the person still holds no membership); this
+        call only removes them from the rotation. D9.
+        """
+        if not self.active:
+            raise ValidationError("This member is already removed from the group")
+
+        self.active = False
+        if forgive_debt and self.debt_pesewas > 0:
+            amount = self.debt_pesewas
+            LedgerEntry.post(
+                None,
+                [
+                    {"account": LedgerAccount.MEMBER_PAYABLE,
+                     "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": amount},
+                    {"account": LedgerAccount.DEBT_RECEIVABLE,
+                     "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": amount},
+                ],
+                entry_type=PostingType.REVERSAL,
+                reference=f"debt-forgive-m{self.pk}-{uuid.uuid4().hex[:8]}",
+                group=self.group,
+                note=f"Debt forgiven on removal: {reason[:200]}",
+                actor=actor,
+            )
+            self.debt_pesewas = 0
+            self.debt_reason = ""
+            self.debt_notified_at = None
+
+        self.save(update_fields=["active", "debt_pesewas", "debt_reason", "debt_notified_at"])
+
+        AuditEvent.record(
+            actor=actor, action="membership.deactivated",
+            target=self, group=self.group,
+            from_state="active", to_state="inactive",
+            reason=reason,
+            actor_role="admin" if actor else "system",
+        )
+        return self
+
 
 class Round(models.Model):
     """A single collection round, frozen the moment it opens.
@@ -398,7 +467,12 @@ class Round(models.Model):
             {
                 "membership_id": m.id,
                 "account_id": m.account_id,
-                "name": str(m.account),
+                # `display_name`, never `str(account)`. This snapshot is served to every member
+                # of the group, and the old fallback rendered a member's mobile money number
+                # when they had given no name — a number that can be used to move money, handed
+                # to everyone in the circle. Act 843 s.19 as well: necessary, relevant, and not
+                # excessive does not include broadcasting a number nobody asked to share.
+                "name": m.account.display_name,
                 "order": m.order,
                 "share_pesewas": shares[m.id],
                 "charged_pesewas": 0,
@@ -487,6 +561,54 @@ class Round(models.Model):
         return self.contributions.filter(membership=membership).exclude(
             status__in=Contribution.TERMINAL_STATUSES
         ).first()
+
+    def paid_pesewas_for(self, membership):
+        """What this member has actually put into the pot this round.
+
+        Verified payments only, and summed over every attempt rather than read off one of them: a
+        member may hold several attempts for a round while only one is ever counted, and a
+        client that displayed "their payment" by reading the newest row would show a voided or
+        reversed amount as though it were money in the pot. C-S1.
+
+        Read per member rather than derived from the round total minus everyone else, because a
+        difference of two totals cannot say *who* is short, and "who still owes" is the question
+        a member actually opens the screen to answer.
+        """
+        return sum(
+            self.contributions.filter(
+                membership=membership, status=Contribution.Status.VERIFIED
+            ).values_list("amount_pesewas", flat=True)
+        )
+
+    def payment_state_by_membership(self):
+        """`membership_id -> {"paid": pesewas, "open_status": str | None}` for the whole round.
+
+        The per-member map the round screen renders, gathered in two queries rather than two per
+        member. A roster can hold fifty people (G3), and asking the database one member at a time
+        turns one screen into a hundred round trips.
+
+        `paid` counts verified attempts only. `open_status` is the attempt currently holding the
+        member's slot, and is `None` when they may pay again — which is the whole freeze rule
+        stated as a fact the client can read rather than a rule it has to reimplement. C-S1, C-S2.
+        """
+        verified = defaultdict(int)
+        for membership_id, amount in self.contributions.filter(
+            status=Contribution.Status.VERIFIED
+        ).values_list("membership_id", "amount_pesewas"):
+            verified[membership_id] += amount
+
+        open_slots = dict(
+            self.contributions.exclude(status__in=Contribution.TERMINAL_STATUSES).values_list(
+                "membership_id", "status"
+            )
+        )
+        return {
+            entry["membership_id"]: {
+                "paid": verified.get(entry["membership_id"], 0),
+                "open_status": open_slots.get(entry["membership_id"]),
+            }
+            for entry in self.roster_snapshot
+        }
 
     def shortfall_pesewas(self):
         gap = self.target_pesewas - self.verified_total_pesewas()

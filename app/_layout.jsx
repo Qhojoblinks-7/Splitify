@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, DarkTheme } from "expo-router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { FeedbackProvider } from "../context/FeedbackContext";
-import { createQueryClient, installApi } from "../services/query";
+import { createQueryClient, forgetPreviousMember, installApi } from "../services/query";
 import { useSessionStore } from "../store/session";
 import colors from "../theme/colors";
 
@@ -30,6 +30,18 @@ export default function RootLayout() {
   const queryClient = useMemo(() => createQueryClient(), []);
   const clearSession = useSessionStore((s) => s.clearSession);
   const restoreSession = useSessionStore((s) => s.restoreSession);
+  const isAuthenticated = useSessionStore((s) => s.isAuthenticated);
+
+  // A rejected token ends the session here rather than only in the store, so the cache goes with
+  // it. Leaving the two out of step would leave one member's groups cached under a key the next
+  // member reads.
+  const endSession = useMemo(
+    () => () => {
+      forgetPreviousMember(queryClient);
+      clearSession();
+    },
+    [queryClient, clearSession]
+  );
 
   useEffect(() => {
     // Point the API wrapper at this build's server and give it a way to read the token and a
@@ -37,7 +49,7 @@ export default function RootLayout() {
     // a request, because a request made before this runs would go out without an auth header.
     installApi({
       baseUrl: process.env.EXPO_PUBLIC_API_URL || "http://127.0.0.1:8000",
-      onUnauthorized: clearSession,
+      onUnauthorized: endSession,
     });
 
     async function prepareApp() {
@@ -54,7 +66,13 @@ export default function RootLayout() {
       }
     }
     prepareApp();
-  }, [clearSession, restoreSession]);
+  }, [endSession, restoreSession]);
+
+  // Whatever is cached belongs to whoever was signed in when it was fetched. Signing in, out,
+  // or being signed out by a rejected token all mean it may now belong to someone else.
+  useEffect(() => {
+    forgetPreviousMember(queryClient);
+  }, [isAuthenticated, queryClient]);
 
   if (!isAppReady) {
     return (
@@ -99,8 +117,10 @@ export default function RootLayout() {
               />
               <Stack.Screen name="Auth/CreateAccount" />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="groups" />
               <Stack.Screen name="susu/create" />
               <Stack.Screen name="susu/[id]" />
+              <Stack.Screen name="susu/round" />
               <Stack.Screen name="HelpSupport" />
               <Stack.Screen name="PrivacyPolicy" />
               <Stack.Screen name="AboutUs" />

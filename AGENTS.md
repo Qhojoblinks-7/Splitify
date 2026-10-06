@@ -27,3 +27,18 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ or v57 
 </ElicitationsGroup>
 
 ```
+
+## Verification (backend)
+
+From the `backend/` directory, always run these after code changes that touch `susu/` or `compliance/`:
+
+- System check (catches Django model/serializer mismatches):
+  `python manage.py check`
+- Test suite:
+  `python -m pytest -p no:cacheprovider`
+
+The venv lives at `backend/.venv/`; on Windows activate it before running either command:
+`.\.venv\Scripts\python.exe manage.py check`
+`.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider`
+
+No ruff/mypy/TypeScript is configured for this repo at this time.

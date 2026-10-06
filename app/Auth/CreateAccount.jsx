@@ -16,6 +16,11 @@ export default function CreateAccount() {
     };
 
     const onPressSignUp = () => {
+        // Gated on the checkbox, deliberately. It used to navigate whatever the box said, which
+        // means the agreement was decoration: s.20(1) requires the data subject's prior consent,
+        // and a checkbox that can be unticked and ignored is not consent. The label points at
+        // the notice rather than at a terms page nobody has written.
+        if (!agree) return;
         router.push('/(tabs)');
     };
 
@@ -39,6 +44,7 @@ export default function CreateAccount() {
                 title="Sign Up"
                 variant='primary'
                 fullWidth
+                disabled={!agree}
                 onPress={onPressSignUp}
               />
             </>
@@ -66,13 +72,18 @@ export default function CreateAccount() {
             />
 
             <View style={styles.checkboxContainer}>
-                <Checkbox 
-                    value={agree} 
-                    onValueChange={setAgree} 
-                    color={agree ? '#fbb81c' : undefined} 
-                    style={styles.checkboxBorderFix} 
+                <Checkbox
+                    value={agree}
+                    onValueChange={setAgree}
+                    color={agree ? '#fbb81c' : undefined}
+                    style={styles.checkboxBorderFix}
                 />
-                <Text style={styles.checkboxLabel}>I agree to Growl Terms & Policies</Text>
+                <Pressable onPress={() => router.push('/PrivacyPolicy')}>
+                    <Text style={styles.checkboxLabel}>
+                        I have read the Privacy Notice, and I agree that Growl may process my data
+                        to run my susu group.
+                    </Text>
+                </Pressable>
             </View>
         </AuthScreenLayout>
     );

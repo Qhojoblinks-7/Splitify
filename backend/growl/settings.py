@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
+    "compliance",
     "susu",
 ]
 
@@ -72,6 +73,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # After authentication, so `request.user` is resolved. Act 843 s.24: retention needs to know
+    # when an account was last used, and this is the only place that knows.
+    "compliance.middleware.LastSeenMiddleware",
 ]
 
 ROOT_URLCONF = "growl.urls"
@@ -145,7 +149,19 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Production hashing. Argon2id is specified by the security document (rule I21); Django's
 # PBKDF2 remains the fallback so the service starts even where argon2-cffi is unavailable.
-PASSWORD_HASHERS = [
+#
+# Argon2id is only used when the library is actually importable. Listing a hasher that cannot be
+# loaded does not degrade gracefully — it raises at the first `set_password`, which is a member
+# trying to sign up — so the list is built from what is installed rather than from what we wish
+# were installed.
+try:  # pragma: no cover - depends on the deployment, not on the code
+    import argon2  # noqa: F401
+
+    _ARGON2 = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
+except ImportError:  # pragma: no cover
+    _ARGON2 = []
+
+PASSWORD_HASHERS = _ARGON2 + [
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
     "django.contrib.auth.hashers.ScryptPasswordHasher",
@@ -176,3 +192,94 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Money never travels as a float. Every amount is an integer number of pesewas; these
 # guards make a float a type error rather than a silently wrong number. M1.
 MONEY_MAX_PESEWAS = 10 ** 12
+
+# Licensed payment partner configuration (Act 987 compliance).
+# Hubtel EPSP is primary; Fincra is fallback. Both are licensed PSPs in Ghana.
+# Set SUSU_RAIL to "hubtel" or "fincra" to select the active adapter.
+# If neither is configured, the worker runs in "unconfigured" mode and settles nothing.
+SUSU_RAIL = os.environ.get("SUSU_RAIL", "unconfigured")
+
+# Hubtel EPSP credentials (primary)
+HUBTEL_BASE_URL = os.environ.get("HUBTEL_BASE_URL", "https://epsp.hubtel.com")
+HUBTEL_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
+HUBTEL_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
+HUBTEL_COLLECTION_ACCOUNT = os.environ.get("HUBTEL_COLLECTION_ACCOUNT", "")
+HUBTEL_TIMEOUT = int(os.environ.get("HUBTEL_TIMEOUT", "30"))
+
+# Fincra credentials (fallback)
+FINCRA_BASE_URL = os.environ.get("FINCRA_BASE_URL", "https://api.fincra.com")
+FINCRA_API_KEY = os.environ.get("FINCRA_API_KEY", "")
+FINCRA_SECRET_KEY = os.environ.get("FINCRA_SECRET_KEY", "")
+FINCRA_TIMEOUT = int(os.environ.get("FINCRA_TIMEOUT", "30"))
+
+# ---------------------------------------------------------------------------
+# Act 1044 AML/CFT — Sanctions/PEP Screening
+# ---------------------------------------------------------------------------
+# Set COMPLIANCE_SCREENER to "world_check", "dow_jones", or "stub" (for tests).
+# If unset or "unconfigured", screening records an error and the account must
+# be screened manually before any transaction is allowed.
+COMPLIANCE_SCREENER = os.environ.get("COMPLIANCE_SCREENER", "unconfigured")
+COMPLIANCE_SCREENER_VERSION = os.environ.get("COMPLIANCE_SCREENER_VERSION", "")
+
+# World-Check / Refinitiv (when contracted)
+WORLD_CHECK_API_KEY = os.environ.get("WORLD_CHECK_API_KEY", "")
+WORLD_CHECK_BASE_URL = os.environ.get("WORLD_CHECK_BASE_URL", "https://api.world-check.com")
+
+# Dow Jones Risk & Compliance (when contracted)
+DOW_JONES_API_KEY = os.environ.get("DOW_JONES_API_KEY", "")
+DOW_JONES_BASE_URL = os.environ.get("DOW_JONES_BASE_URL", "https://api.dowjones.com")
+
+# BoG sanctions list (public, no auth required)
+BOG_SANCTIONS_URL = os.environ.get(
+    "BOG_SANCTIONS_URL", "https://www.bog.gov.gh/wp-content/uploads/sanctions-list.json"
+)
+
+# Screening behaviour
+SCREENING_REQUIRED_AT_ONBOARDING = os.environ.get("SCREENING_REQUIRED_AT_ONBOARDING", "1") == "1"
+SCREENING_REQUIRED_BEFORE_PAYOUT = os.environ.get("SCREENING_REQUIRED_BEFORE_PAYOUT", "1") == "1"
+
+# Periodic re-screening interval (days)
+SCREENING_RESCREEN_INTERVAL_DAYS = int(os.environ.get("SCREENING_RESCREEN_INTERVAL_DAYS", "30"))
+
+
+# ---------------------------------------------------------------------------
+# Act 843 s.28 — safeguards, not intentions
+# ---------------------------------------------------------------------------
+#
+# The registration application asks the Commission for "a general description of measures to be
+# taken to secure the data" (s.47(1)(i)), and s.28(2) asks that they be verified as well as
+# established. A description of measures that are not switched on is a false particular, which
+# s.47(2) makes an offence, so these are set from the environment rather than promised in a
+# document.
+#
+# Guarded on DEBUG so the development server over plain HTTP on a LAN still works. In
+# production they are not optional, and the secret key check below is a refusal to start rather
+# than a warning: a deployment running on the published development key has every signed token
+# in the system forgeable, and that is not something to discover from a log line.
+if not DEBUG:
+    from django.core.exceptions import ImproperlyConfigured
+
+    if SECRET_KEY == "dev-only-not-for-production":
+        raise ImproperlyConfigured(
+            "GROWL_SECRET_KEY is unset in production. Every JWT this service signs is forgeable "
+            "with the value in the source tree, so the service will not start until it is set."
+        )
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured(
+            "GROWL_ALLOWED_HOSTS is unset in production. Set it to the hostnames this API answers "
+            "on; a wildcard is not a value."
+        )
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31_536_000          # 12 months
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    # The API sits behind a TLS-terminating proxy, so this is how Django learns the request
+    # arrived over HTTPS. Without it SECURE_SSL_REDIRECT loops: every request is "insecure" and
+    # is redirected to the same URL forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"

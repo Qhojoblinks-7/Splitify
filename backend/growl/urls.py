@@ -13,11 +13,20 @@ reuse revokes the whole family. I23.
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from compliance.api import (
+    ConsentView,
+    MyDataView,
+    PrivacyRequestDetailView,
+    PrivacyRequestListCreateView,
+    PublicNoticeView,
+)
 from susu.api import (
     ContributionCreateView,
     ContributionTransitionView,
     CurrentRoundView,
     GroupAuditFeedView,
+    GroupCreateView,
+    GroupJoinView,
     GroupListView,
     RoundDetailView,
 )
@@ -26,7 +35,9 @@ urlpatterns = [
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
-    path("api/groups/", GroupListView.as_view(), name="group-list"),
+    path("api/groups/", GroupCreateView.as_view(), name="group-list"),
+    path("api/groups/", GroupCreateView.as_view(), name="group-create"),
+    path("api/groups/join/", GroupJoinView.as_view(), name="group-join"),
     path("api/groups/<int:group_id>/rounds/current/", CurrentRoundView.as_view(),
          name="current-round"),
     path("api/groups/<int:group_id>/audit/", GroupAuditFeedView.as_view(),
@@ -37,4 +48,13 @@ urlpatterns = [
          name="contribution-create"),
     path("api/contributions/<int:pk>/<str:transition>/", ContributionTransitionView.as_view(),
          name="contribution-transition"),
+
+    # Act 843. The notice is public because s.27(2) requires it *before* collection, which is
+    # a moment no authenticated request can reach. Everything else is the caller's own data only.
+    path("api/privacy/notice/", PublicNoticeView.as_view(), name="privacy-notice"),
+    path("api/privacy/export/", MyDataView.as_view(), name="privacy-export"),
+    path("api/privacy/consent/", ConsentView.as_view(), name="privacy-consent"),
+    path("api/privacy/requests/", PrivacyRequestListCreateView.as_view(), name="privacy-requests"),
+    path("api/privacy/requests/<int:request_id>/", PrivacyRequestDetailView.as_view(),
+         name="privacy-request-detail"),
 ]

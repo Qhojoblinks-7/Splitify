@@ -1,16 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, Image, StyleSheet } from "react-native";
 
-export default function AuthScreenLayout({ title, children, footer, brand }) {
+export default function AuthScreenLayout({ title, children, footer }) {
   return (
     <View style={styles.Container}>
-      <View style={styles.top}>
-        {brand ? <Text style={styles.brand}>{brand}</Text> : null}
-        {title ? <Text style={styles.title}>{title}</Text> : null}
-        <View style={styles.content}>{children}</View>
-      </View>
-      <View style={styles.spacer} />
-      <View style={styles.footer}>{footer}</View>
+      <Image source={require("../../assets/ntuboa.png")} style={styles.logo} />
+      {title ? <Text style={styles.title}>{title}</Text> : null}
+      <View style={styles.content}>{children}</View>
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
   );
 }
@@ -20,35 +17,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#16171b",
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  top: {
-    width: "100%",
-    alignItems: "flex-start",
+  logo: {
+    width: 200,
+    height: 80,
+    resizeMode: "contain",
+    marginBottom: 16,
   },
   content: {
     width: "100%",
-    marginTop: 10,
-  },
-  spacer: {
-    flex: 1,
+    alignItems: "stretch",
   },
   footer: {
     width: "100%",
     alignItems: "center",
-  },
-  brand: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#ffffff",
-    marginBottom: 24,
-    letterSpacing: -0.5,
+    marginTop: 24,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#ffffff",
-    marginBottom: 10,
+    marginBottom: 24,
+    textAlign: "center",
   },
 });

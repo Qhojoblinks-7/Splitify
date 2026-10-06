@@ -1,0 +1,20 @@
+# Runtime dependencies for the Growl backend.
+#
+# `requests` is here for the payment-rail adapters in `susu/rail.py` (Hubtel EPSP primary,
+# Fincra fallback). It is used only to ask a licensed partner what it saw about a reference;
+# nothing in this application ever moves money.
+
+Django==5.2.17
+djangorestframework==3.18.1
+djangorestframework_simplejwt==5.5.1
+requests==2.34.2
+
+# Transitive, pinned so a fresh install matches what the tests were verified against.
+asgiref==3.12.1
+sqlparse==0.6.0
+tzdata==2026.5
+PyJWT==2.15.1
+certifi==2026.7.22
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0

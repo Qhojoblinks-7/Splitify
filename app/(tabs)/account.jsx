@@ -14,6 +14,7 @@ import {
   CloudOff,
   IdCard,
   Phone,
+  ShieldCheck,
 } from "lucide-react-native";
 import { useSessionStore } from "../../store/session";
 import { useNetworkStore } from "../../store/network";
@@ -159,6 +160,12 @@ export default function Account() {
 
         <SectionLabel>Support</SectionLabel>
         <MenuItem icon={HelpCircle} label="Help & Support" onPress={() => router.push("/HelpSupport")} />
+        <MenuItem
+          icon={ShieldCheck}
+          label="Your privacy"
+          hint="See what we hold, ask us to correct or delete it"
+          onPress={() => router.push("/PrivacyRights")}
+        />
         <MenuItem icon={FileText} label="Privacy Policy" onPress={() => router.push("/PrivacyPolicy")} />
         <MenuItem icon={ScrollText} label="Terms of Service" onPress={() => router.push("/TermsOfService")} />
         <MenuItem icon={Info} label="About Growl" onPress={() => router.push("/AboutUs")} />

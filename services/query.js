@@ -46,6 +46,26 @@ export const queryKeys = {
 /** Every round, whatever the shape of its key. Used to invalidate after money moves. */
 const ANY_ROUND = ["round"];
 
+/**
+ * Forget everything the server told us about the member who just left.
+ *
+ * The keys here are `["groups"]`, `["round", id]`, `["audit", groupId]` — none of them name the
+ * account they belong to. That is fine while one person uses a phone and wrong the moment a
+ * second one does: on sign-in the cache still holds the previous member's groups under the same
+ * key, so the app renders their finances to someone who has no business seeing them. The
+ * network is correctly scoped by the token; the cache was not.
+ *
+ * Scoping every key by account would also fix it, but every key would then have to be built
+ * with an id that does not exist before sign-in, and a key built wrong fails open — two members
+ * silently sharing a cache entry again. Clearing on every session change cannot fail that way:
+ * no session change means the same person, and any change means nothing survives.
+ *
+ * Called on sign-in, on sign-out, and whenever the server rejects the token.
+ */
+export function forgetPreviousMember(queryClient) {
+  queryClient.clear();
+}
+
 export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -124,6 +144,32 @@ function settleRound(queryClient, payload) {
 }
 
 export const mutations = {
+  /**
+   * Start a group.
+   *
+   * The roster is deliberately not part of this request. A membership points at a real account,
+   * not at a name typed into a form, so the only person this can add to the rotation is the
+   * caller — everyone else arrives later by redeeming the invite code in the response. A create
+   * form that collected names would be asking the server to seat people who never agreed to it.
+   */
+  createGroup: (queryClient) => ({
+    mutationKey: ["group", "create"],
+    mutationFn: ({ name, targetPesewas, collectionDay, description }) =>
+      apiFetch("/api/groups/", {
+        method: "POST",
+        body: { name, targetPesewas, collectionDay, description },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.groups() }),
+  }),
+
+  /** Redeem an invite code. Adds the caller and nobody else. */
+  joinGroup: (queryClient) => ({
+    mutationKey: ["group", "join"],
+    mutationFn: ({ inviteCode }) =>
+      apiFetch("/api/groups/join/", { method: "POST", body: { inviteCode } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.groups() }),
+  }),
+
   logContribution: (queryClient) => ({
     mutationKey: ["contribution", "record"],
     mutationFn: ({ roundId, amountPesewas, reference, idempotencyKey }) =>

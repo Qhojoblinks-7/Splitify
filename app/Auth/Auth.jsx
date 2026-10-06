@@ -1,11 +1,29 @@
-import { useState } from 'react';
-import { Text, View, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  Text,
+  View,
+  Image,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  useWindowDimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import GoogleIcon from '../../assets/images/google.svg';
 import BaseButton from '../../components/atoms/BaseButton';
 
+const LOGO_HEIGHT = 52;
+const MAX_LOGO_WIDTH = 180;
+
 export default function Auth() {
-    const router = useRouter();
+  const router = useRouter();
+  const { width, height } = useWindowDimensions();
+
+  // The logo is the only element that has to give way. Scaling it to the viewport keeps the
+  // wordmark from dominating a small screen while still filling a large one, and the clamp
+  // stops it stretching past the width of the buttons below it.
+  const logoWidth = Math.min(width * 0.46, MAX_LOGO_WIDTH);
+  const logoHeight = logoWidth * (LOGO_HEIGHT / MAX_LOGO_WIDTH);
+  const compact = height < 700;
 
   const onPressGoogle = () => {
     // Handle Google Sign-In logic here
@@ -22,120 +40,153 @@ export default function Auth() {
 
   const onPressLogin = () => {
     // Navigate to Login screen or handle login logic
-    router.push("/Auth/Login"); // Replace with the main app screen route
+    router.push('/Auth/Login'); // Replace with the main app screen route
   };
 
   return (
-    <View style={styles.container}>
-
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        compact && styles.contentCompact,
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Brand wordmark */}
-      <Text style={styles.brand}>Growl</Text>
+      <Image
+        source={require('../../assets/ntuboa.png')}
+        style={{ width: logoWidth, height: logoHeight }}
+      />
       <Text style={styles.tagline}>Grow Your Wealth Together</Text>
 
-      <Text style={styles.title}>Let's Get Started</Text>
+      <Text style={[styles.title, compact && styles.titleCompact]}>Let's Get Started</Text>
 
       {/* Social Button Grouping container */}
       <View style={styles.buttonGroup}>
-        <BaseButton 
-          title='Continue with Google' 
-          onPress={onPressGoogle} 
-          fullWidth 
+        <BaseButton
+          title='Continue with Google'
+          onPress={onPressGoogle}
+          fullWidth
           variant='secondary'
-          icon={
-            <GoogleIcon width={24} height={24} /> // Using the imported SVG as a React component
-          } 
+          icon={<GoogleIcon width={24} height={24} />}
         />
 
-        <BaseButton 
-          title='Continue with Apple' 
-          onPress={onPressApple} 
-          fullWidth 
-          variant='secondary' 
+        <BaseButton
+          title='Continue with Apple'
+          onPress={onPressApple}
+          fullWidth
+          variant='secondary'
           icon={
-            <Image 
-        source={require('../../assets/images/Apple.png')} // Replace with your actual local project asset path
-        style={styles.socialIcon}
-      />
-          } 
+            <Image
+              source={require('../../assets/images/Apple.png')}
+              style={styles.socialIcon}
+            />
+          }
         />
       </View>
 
-      <Text style={styles.orText}>or</Text>
+      <View style={styles.orRow}>
+        <View style={styles.orRule} />
+        <Text style={styles.orText}>or</Text>
+        <View style={styles.orRule} />
+      </View>
 
       {/* Main Authentication Flow Grouping */}
       <View style={styles.buttonGroup}>
-        <BaseButton 
-          title='Sign Up' 
-          onPress={onPressSignUp} 
-          fullWidth 
+        <BaseButton
+          title='Sign Up'
+          onPress={onPressSignUp}
+          fullWidth
         />
-        
-        <BaseButton 
-          title='Login' 
-          onPress={onPressLogin} 
-          fullWidth 
-          variant='outline' 
+
+        <BaseButton
+          title='Login'
+          onPress={onPressLogin}
+          fullWidth
+          variant='outline'
         />
       </View>
 
-      <View style={{  }} />
-      <TouchableOpacity onPress={() => router.push("/PrivacyPolicy")}>
-        <Text style={{ color: '#666666', fontSize: 12, marginTop: 50 }}>
-          Privacy Policy | Terms of Service
-        </Text>
+      <TouchableOpacity
+        onPress={() => router.push('/PrivacyPolicy')}
+        hitSlop={12}
+        style={styles.legal}
+      >
+        <Text style={styles.legalText}>Privacy Policy | Terms of Service</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#16171b', // Sleek Growl dark canvas background
   },
-  logoImage: {
-    width: 200,
-    height: 100,
-    borderRadius: 20,
-    marginBottom: 32,
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  brand: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -1,
+  contentCompact: {
+    paddingVertical: 20,
   },
   tagline: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#fbb81c',
-    marginBottom: 28,
+    marginTop: 12,
+    marginBottom: 20,
   },
-  socialIcon: {
+socialIcon: {
     width: 50,
     height: 50,
     resizeMode: 'contain', // Safeguards the vector asset ratio from stretching
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff', // High-contrast white text header
-    marginBottom: 12,
+    marginBottom: 20,
     textAlign: 'center',
+  },
+  titleCompact: {
+    fontSize: 20,
+    marginBottom: 16,
   },
   buttonGroup: {
     width: '100%',
-    gap: 14, // Built-in flex gaps separate buttons beautifully without repetitive margins
+    gap: 10, // Built-in flex gaps separate buttons without repetitive margins
+  },
+  // Rules either side of "or" instead of vertical space, so the divider reads as a divider
+  // and stops the gap from growing on a tall screen.
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginVertical: 16,
+    gap: 12,
+  },
+  orRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#3a3b40',
   },
   orText: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 12,
+    color: '#8a8b90',
     fontWeight: '600',
-    marginVertical: 20,
-    textTransform: 'uppercase', // Gives 'OR' a clean structural layout profile
+    textTransform: 'uppercase',
   },
-  
+  // Fixed margin keeps the legal text centered with the rest of the content
+  // instead of pushing it to the bottom of the screen.
+  legal: {
+    marginTop: 24,
+  },
+  legalText: {
+    color: '#8a8b90',
+    fontSize: 12,
+  },
 });

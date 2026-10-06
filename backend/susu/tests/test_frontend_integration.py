@@ -46,24 +46,32 @@ PASSWORD = "pw-integration-fixture-secret"
 
 @pytest.fixture
 def seed():
-    """A group with a frozen round, an admin and an outsider.
+    """A group with a frozen round, an admin, an outsider and a newcomer.
 
-    Two members so the roster is a real allocation rather than one share, and an outsider so
-    the authorization assertions have someone to be refused.
+    Two members so the roster is a real allocation rather than one share, an outsider so the
+    authorization assertions have someone to be refused, and a newcomer who belongs to nothing
+    until a join test redeems a code. The newcomer is deliberately a third account: sharing the
+    outsider would leave the outsider holding a group, and the isolation assertion depends on
+    there being someone who belongs to none.
     """
     admin = Account.objects.create_user(phone="+233201000001", password=PASSWORD)
     group = SusuGroup.objects.create_group(
         name="Live Susu", target_pesewas=30000, collection_day=5,
         admin=admin, invite_code="LIVE01",
     )
+    members = {}
     for order, number in ((2, "+233201000002"), (3, "+233201000003")):
         person = Account.objects.create_user(phone=number, password=PASSWORD)
         Membership.objects.create(group=group, account=person, order=order)
+        members[order] = person
 
     outsider = Account.objects.create_user(phone="+233201000099", password=PASSWORD)
+    newcomer = Account.objects.create_user(phone="+233201000098", password=PASSWORD)
     return {
         "admin": admin,
+        "payer": members[2],
         "outsider": outsider,
+        "newcomer": newcomer,
         "group": group,
         "round": Round.open_current(group),
     }
@@ -87,6 +95,13 @@ def run_jest(live_server, seed):
         "GROWL_API_TOKEN": issue_token(seed["admin"]),
         "GROWL_API_OUTSIDER_TOKEN": issue_token(seed["outsider"]),
         "GROWL_API_PHONE": seed["admin"].phone,
+        # A member who is not the admin. Payments are logged as this account because an admin may
+        # not confirm their own money, so a suite that had the admin pay and confirm was testing
+        # a transition the API now refuses.
+        "GROWL_API_PAYER_PHONE": seed["payer"].phone,
+        "GROWL_API_PAYER_TOKEN": issue_token(seed["payer"]),
+        "GROWL_API_OUTSIDER_PHONE": seed["outsider"].phone,
+        "GROWL_API_NEWCOMER_PHONE": seed["newcomer"].phone,
         "GROWL_API_PASSWORD": PASSWORD,
         "GROWL_API_GROUP_ID": str(seed["group"].id),
         "GROWL_API_ROUND_ID": str(seed["round"].id),

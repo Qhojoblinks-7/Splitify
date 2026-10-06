@@ -47,7 +47,6 @@ export default function Login() {
 
   return (
     <AuthScreenLayout
-      brand="Growl"
       title="Welcome Back!"
       footer={
         <BaseButton
