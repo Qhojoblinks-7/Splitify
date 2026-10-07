@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import Checkbox from 'expo-checkbox';
@@ -7,6 +7,7 @@ import BaseButton from '../../components/atoms/BaseButton';
 import CustomInput from '../../components/atoms/CustomInput';
 import AuthScreenLayout from '../../components/molecule/AuthScreenLayout';
 import { useSessionStore } from '../../store/session';
+import { loadPhone } from '../../services/tokenStorage';
 import colors from "../../theme/colors";
 
 /**
@@ -21,6 +22,7 @@ export default function Login() {
   const router = useRouter();
   const [rememberMe, setRememberMe] = useState(false);
   const [phone, setPhone] = useState('');
+  const [phoneLoaded, setPhoneLoaded] = useState(false);
   const [password, setPassword] = useState('');
 
   const authenticate = useSessionStore((s) => s.authenticate);
@@ -30,6 +32,15 @@ export default function Login() {
   const busy = status === 'signingIn';
 
   const canSubmit = phone.trim().length > 0 && password.length > 0 && !busy;
+
+  useEffect(() => {
+    loadPhone().then((saved) => {
+      if (saved) {
+        setPhone(saved);
+      }
+      setPhoneLoaded(true);
+    });
+  }, []);
 
   const onPressLogin = async () => {
     if (!canSubmit) return;

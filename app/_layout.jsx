@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, ActivityIndicator, StyleSheet, AppState } from "react-native";
+import { View, StyleSheet, AppState } from "react-native";
 import { Stack, Redirect } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import { createQueryClient, forgetPreviousMember, installApi } from "../services
 import { useSessionStore } from "../store/session";
 import { useSecurityStore, IDLE_TIMEOUT_MS } from "../store/security";
 import AppLockScreen from "../components/molecule/AppLockScreen";
+import SplashScreenView from "../components/molecule/SplashScreen";
 import colors from "../theme/colors";
 
 SplashScreen.preventAutoHideAsync();
@@ -112,11 +113,7 @@ export default function RootLayout() {
   }, [isAuthenticated, queryClient]);
 
   if (!isAppReady) {
-    return (
-      <View style={styles.splashContainer}>
-        <ActivityIndicator size="large" color={colors.gold} />
-      </View>
-    );
+    return <SplashScreenView />;
   }
 
   return (
@@ -186,10 +183,4 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: colors.background },
-  splashContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
 });

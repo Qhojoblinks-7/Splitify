@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { initialsOf } from "../services/susu";
 import { ApiError, setAccessToken, signIn as signInRequest, signUp as signUpRequest } from "../services/auth";
-import { clearTokens, loadTokens, saveTokens } from "../services/tokenStorage";
+import { clearTokens, loadTokens, saveTokens, savePhone } from "../services/tokenStorage";
 import { fetchConsent, fetchNotice, giveConsent } from "../services/privacy";
 import colors from "../theme/colors";
 
@@ -165,6 +165,7 @@ export const useSessionStore = create((set, get) => ({
       const session = await signUpRequest({ phone, email, password });
 
       await saveTokens(session).catch(() => {});
+      await savePhone(phone).catch(() => {});
 
       set({
         token: session.access,

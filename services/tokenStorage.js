@@ -17,6 +17,7 @@ import * as SecureStore from "expo-secure-store";
 
 const ACCESS_KEY = "growl.session.access";
 const REFRESH_KEY = "growl.session.refresh";
+const PHONE_KEY = "growl.session.phone";
 
 let backend = null;
 
@@ -78,4 +79,27 @@ export async function loadTokens() {
 export async function clearTokens() {
   const store = await resolveBackend();
   await Promise.all([store.wipe(ACCESS_KEY), store.wipe(REFRESH_KEY)]);
+}
+
+/**
+ * Remember the phone number after registration so the Login screen can pre-fill it.
+ *
+ * Deliberately NOT cleared on sign-out: a member signing out is not deleting their
+ * account, and being asked for the identifier again adds friction. The phone number
+ * is not sensitive enough to require key-chain storage; the memory fallback covers
+ * devices without SecureStore.
+ */
+export async function savePhone(phone) {
+  const store = await resolveBackend();
+  await store.write(PHONE_KEY, phone);
+}
+
+export async function loadPhone() {
+  const store = await resolveBackend();
+  return store.read(PHONE_KEY);
+}
+
+export async function clearPhone() {
+  const store = await resolveBackend();
+  await store.wipe(PHONE_KEY);
 }

@@ -18,7 +18,7 @@ const secureStoreMock = require("./support/expoSecureStoreMock");
 
 const { ApiError, configureApi } = require("../services/api");
 const { getAccessToken, setAccessToken } = require("../services/auth");
-const { clearTokens, loadTokens, saveTokens, tokenStorageName } = require(
+const { clearTokens, loadTokens, saveTokens, savePhone, loadPhone, clearPhone, tokenStorageName } = require(
   "../services/tokenStorage"
 );
 
@@ -67,6 +67,23 @@ describe("writing and reading a session", () => {
     await clearTokens();
 
     expect(await loadTokens()).toEqual({ access: null, refresh: null });
+  });
+});
+
+describe("remembering the phone number", () => {
+  test("saves and loads the phone number", async () => {
+    await savePhone("+233201000001");
+    expect(await loadPhone()).toBe("+233201000001");
+  });
+
+  test("returns null when no phone was saved", async () => {
+    expect(await loadPhone()).toBe(null);
+  });
+
+  test("clearing removes the saved phone", async () => {
+    await savePhone("+233201000001");
+    await clearPhone();
+    expect(await loadPhone()).toBe(null);
   });
 });
 
