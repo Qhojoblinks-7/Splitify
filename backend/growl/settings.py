@@ -199,6 +199,12 @@ MONEY_MAX_PESEWAS = 10 ** 12
 # If neither is configured, the worker runs in "unconfigured" mode and settles nothing.
 SUSU_RAIL = os.environ.get("SUSU_RAIL", "unconfigured")
 
+# --- Social Sign-In -----------------------------------------------------------
+# Google and Apple OAuth client IDs. The frontend performs the provider flow and
+# submits an ID token here for verification.
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+APPLE_CLIENT_ID = os.environ.get("APPLE_CLIENT_ID", "")
+
 # Hubtel EPSP credentials (primary)
 HUBTEL_BASE_URL = os.environ.get("HUBTEL_BASE_URL", "https://epsp.hubtel.com")
 HUBTEL_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")

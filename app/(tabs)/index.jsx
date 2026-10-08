@@ -4,7 +4,7 @@
  * Group listings moved to the Groups tab.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,11 +13,13 @@ import {
   Pressable,
   RefreshControl,
   FlatList,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Plus, Users, TrendingUp, KeyRound, AlertTriangle, Clock, HandCoins, FileText, RefreshCw } from "lucide-react-native";
+import { Plus, Users, TrendingUp, AlertTriangle, HandCoins, FileText, RefreshCw, Hash } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import BottomSheet from "../../components/molecule/BottomSheet";
 import EmptyState from "../../components/molecule/EmptyState";
 import { useTabBarHeight } from "./_layout";
 import OfflineBanner, { PendingSyncBanner } from "../../components/molecule/OfflineBanner";
@@ -25,12 +27,14 @@ import { SkeletonList } from "../../components/molecule/Skeleton";
 import { ApiError } from "../../services/api";
 import { formatGHC } from "../../services/money";
 import { mutations, queries } from "../../services/query";
+import { INVITE_CODE_LENGTH } from "../../services/susu";
 import colors from "../../theme/colors";
 
 export default function SusuHome() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const tabBarHeight = useTabBarHeight();
 
   const {
     data: summary,
@@ -39,6 +43,12 @@ export default function SusuHome() {
     refetch,
     isRefetching,
   } = useQuery(queries.memberSummary());
+
+  const join = useMutation(mutations.joinGroup(queryClient));
+
+  const [joinVisible, setJoinVisible] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState(null);
 
   const due = summary?.due ?? [];
   const activeCount = summary?.activeGroupCount ?? 0;
@@ -55,6 +65,33 @@ export default function SusuHome() {
     }
   }, [router]);
 
+  const openJoin = (presetCode = "") => {
+    setJoinCode(
+      String(presetCode)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, INVITE_CODE_LENGTH)
+    );
+    setJoinError(null);
+    setJoinVisible(true);
+  };
+
+  const onJoin = () => {
+    setJoinError(null);
+    join.mutate(
+      { inviteCode: joinCode },
+      {
+        onSuccess: (group) => {
+          setJoinVisible(false);
+          router.push(`/susu/round?id=${group.id}`);
+        },
+        onError: (err) => {
+          setJoinError(err instanceof ApiError ? err.message : "That code could not be redeemed.");
+        },
+      }
+    );
+  };
+
   const dueLabel = (entry) => {
     const days = Math.ceil(
       (new Date(entry.dueAt) - Date.now()) / 86400000
@@ -67,8 +104,8 @@ export default function SusuHome() {
   };
 
   const actions = [
+    { label: "Join", Icon: Users, onPress: () => openJoin() },
     { label: "Start", Icon: Plus, onPress: () => router.push("/susu/create") },
-    { label: "Groups", Icon: Users, onPress: () => router.push("/(tabs)/groups") },
     {
       label: "Contribute",
       Icon: HandCoins,
@@ -179,6 +216,49 @@ export default function SusuHome() {
           <Text style={styles.summaryLabel}>paid in, verified</Text>
         </View>
       </View>
+
+      <BottomSheet
+        isVisible={joinVisible}
+        onClose={() => setJoinVisible(false)}
+        title="Join a susu group"
+        bottomInset={tabBarHeight}
+      >
+        <View style={styles.sheet}>
+          <View style={styles.codeWrap}>
+            <Hash size={20} color={colors.textMuted} />
+            <TextInput
+              style={styles.codeInput}
+              placeholder="- - - - - -"
+              placeholderTextColor={colors.placeholder}
+              value={joinCode}
+              onChangeText={(text) => {
+                setJoinCode(text.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, INVITE_CODE_LENGTH));
+                setJoinError(null);
+              }}
+              autoCapitalize="characters"
+              maxLength={INVITE_CODE_LENGTH}
+              accessibilityLabel="Invite code"
+              autoCorrect={false}
+            />
+          </View>
+          <Text style={styles.sheetHint}>
+            Ask the group admin for the {INVITE_CODE_LENGTH}-character code. You will be
+            added to the end of the rotation, under your own account.
+          </Text>
+
+          {joinError ? <Text style={styles.sheetError}>{joinError}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.submit, (joinCode.length !== INVITE_CODE_LENGTH || join.isPending) && styles.submitDisabled]}
+            disabled={joinCode.length !== INVITE_CODE_LENGTH || join.isPending}
+            onPress={onJoin}
+          >
+            <Text style={styles.submitText}>
+              {join.isPending ? "Joining…" : "Join group"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
     </View>
   );
 }
@@ -269,4 +349,34 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   createBtnText: { color: colors.background, fontSize: 16, fontWeight: "700" },
+  sheet: { gap: 8 },
+  codeWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    height: 56,
+  },
+  codeInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: 6,
+  },
+  sheetHint: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  sheetError: { color: colors.danger, fontSize: 13, marginTop: 4 },
+  submit: {
+    backgroundColor: colors.gold,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  submitDisabled: { backgroundColor: colors.borderSubtle },
+  submitText: { color: colors.background, fontSize: 16, fontWeight: "700" },
 });

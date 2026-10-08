@@ -1,4 +1,4 @@
-# Master Roadmap — Growl
+# Master Roadmap — Ntuboa
 
 **Grow Your Wealth Together**
 
@@ -122,8 +122,8 @@ Everything above is built on estimates. Close the gap before writing more code.
 ### Phase 0 — Research & compliance (weeks 1–4)
 1. Field interviews; GCSCA register
 2. Act 987 opinion + agency agreement
-3. Names: decide the brand. "Growl" collides with a live app on Google Play; the repo name
-   "Splitify" describes the split-bill product we just dropped. **Both need replacing.**
+3. Names: decided — the app ships as **Ntuboa** (Twi for a rotating savings group); the repo name
+   "Splitify" describes the split-bill product we just dropped and is retained as the repo name only.
 4. Ghana Data Protection Commission registration
 
 ### Phase 1 — Make it real (weeks 5–12)
@@ -156,18 +156,16 @@ Everything above is built on estimates. Close the gap before writing more code.
 Everything else is diagnostic: groups live, rounds completed without dispute, groups activated per
 recruited collector, active diaspora senders, SMS unit cost.
 
-## Naming — unresolved
+## Naming — resolved
 
-The app ships as **Growl**; the repo is **Splitify**; the product is a susu app. Three different
-names for one thing.
+The app ships as **Ntuboa**; the repo is **Splitify**; the product is a susu app.
 
-- **"Growl"** collides with a live pizza-delivery app on Google Play (LimeTray Tap) and has no
-  relationship to susu. Unusable for ASO.
+- **"Ntuboa"** is a Ghanaian (Twi) word for a rotating savings group — the product itself, so it is
+  on-brand and works for ASO. It does not collide with any live app on Google Play.
 - **"Splitify"** now names the exact feature Apple commoditised, and a product we do not build.
+  Retained as the repo name only.
 
-A proper naming sprint (Ghanaian users, a native-speaker brand lead, a trademark search in
-Ghana/UK/US) and a decision are needed before public launch. **Keep "susu" and "group savings" in
-the store title and tagline regardless of the brand.**
+**Keep "susu" and "group savings" in the store title and tagline regardless of the brand.**
 
 ## Reference material
 

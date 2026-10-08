@@ -35,6 +35,7 @@ beforeEach(() => {
     status: "idle",
     storage: "unknown",
     authError: null,
+    requires_profile_completion: false,
   });
   setAccessToken(null);
 });

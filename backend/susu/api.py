@@ -119,6 +119,7 @@ class PayoutSerializer(serializers.Serializer):
     feePesewas = serializers.IntegerField(source="fee_pesewas")
     status = serializers.CharField()
     receiverMembershipId = serializers.IntegerField(source="receiver_id")
+    completedAt = serializers.DateTimeField(source="completed_at", required=False, allow_null=True)
 
 
 class RoundDetailSerializer(serializers.Serializer):
@@ -134,6 +135,7 @@ class RoundDetailSerializer(serializers.Serializer):
     number = serializers.IntegerField()
     cycle = serializers.IntegerField()
     outcome = serializers.CharField()
+    groupName = serializers.CharField(source="group.name")
     targetPesewas = serializers.IntegerField(source="target_pesewas")
     feePesewas = serializers.IntegerField(source="fee_pesewas")
     openedAt = serializers.DateTimeField(source="opened_at")

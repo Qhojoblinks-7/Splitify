@@ -60,6 +60,7 @@ export function toRoundView(round) {
     number: round.number,
     cycle: round.cycle,
     outcome: round.outcome,
+    groupName: round.groupName,
 
     openedAt: round.openedAt,
     dueAt: round.dueAt,
@@ -132,11 +133,12 @@ export function toRoundView(round) {
     conservationResidual: round.conservationResidual ?? 0,
     debtResidual: round.debtResidual ?? 0,
 
-    payout: round.payout
+     payout: round.payout
       ? {
           status: round.payout.status,
           amount: formatSigned(round.payout.amountPesewas),
           fee: formatSigned(round.payout.feePesewas),
+          completedAt: round.payout.completedAt ?? null,
           receiverMembershipId: round.payout.receiverMembershipId,
         }
       : null,

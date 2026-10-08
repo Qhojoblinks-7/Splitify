@@ -1,12 +1,12 @@
-# Growl
+# Ntuboa
 
 **Grow Your Wealth Together**
 
-Growl is a mobile app for one thing: running a group susu — the rotating savings group common
+Ntuboa is a mobile app for one thing: running a group susu — the rotating savings group common
 across Ghana and West Africa. Everyone in the circle contributes a set amount each week, and
 each member takes the full pot in turn.
 
-## What Growl does
+## What Ntuboa does
 
 - **Create a susu group** — set the group name, the pot per round, the collection day, and the members in rotation order.
 - **Fixed weekly rotation** — every member knows whose turn it is and when.

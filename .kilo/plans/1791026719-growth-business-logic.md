@@ -1,4 +1,4 @@
-# Six-Month Business Logic — Growl
+# Six-Month Business Logic — Ntuboa
 
 Governing rules for the next six months. Every product decision must trace to a rule ID in this
 document, or it does not ship.

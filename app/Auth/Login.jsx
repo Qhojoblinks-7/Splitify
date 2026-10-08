@@ -31,7 +31,7 @@ export default function Login() {
   const clearAuthError = useSessionStore((s) => s.clearAuthError);
   const busy = status === 'signingIn';
 
-  const canSubmit = phone.trim().length > 0 && password.length > 0 && !busy;
+  const canSubmit = phone.trim().length > 0 && password.length >= 12 && !busy;
 
   useEffect(() => {
     loadPhone().then((saved) => {

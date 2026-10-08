@@ -18,10 +18,11 @@
  * as a refusal rather than as something to try again.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -31,12 +32,15 @@ import {
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react-native";
+import { AlertTriangle, Share2 } from "lucide-react-native";
 
 import { ApiError } from "../../services/api";
 import { toPesewas } from "../../services/money";
 import { mutations, queries } from "../../services/query";
+import { turnCardText } from "../../services/statement";
 import { toRoundView } from "../../services/roundView";
+import { toast } from "../../utils/alert";
+import TurnCard from "../../components/molecule/TurnCard";
 import colors from "../../theme/colors";
 
 /** GH¢ label. The figures themselves are already formatted by the view model. */
@@ -179,6 +183,41 @@ function ContributeCard({ view, pay, withdraw }) {
 }
 
 /**
+ * Short-round debt notice.
+ *
+ * When a member missed paying their share in a round, the debt carries forward
+ * and is deducted from their next payout. This message explains that to the
+ * member — silence here is the trust gap the app exists to close.
+ */
+function ShortRoundWarning({ owed, nextPayoutRound, cycle, isReceiver, pendingPayout }) {
+  if (isReceiver) {
+    return (
+      <View style={[styles.card, styles.warningCard]}>
+        <View style={styles.warningRow}>
+          <AlertTriangle size={18} color={colors.danger} />
+          <Text style={styles.warningText}>
+            You are the receiver this round, but you have <Text style={styles.warningAmount}>GH¢ {owed}</Text> in unpaid debt.{" "}
+            Your payout of <Text style={styles.warningAmount}>GH¢ {pendingPayout}</Text> will be reduced by that amount when released.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.card, styles.warningCard]}>
+      <View style={styles.warningRow}>
+        <AlertTriangle size={18} color={colors.danger} />
+        <Text style={styles.warningText}>
+          You missed a round. <Text style={styles.warningAmount}>GH¢ {owed}</Text> is owed and will be
+          taken from your next payout in round {nextPayoutRound}{cycle ? `, cycle ${cycle}` : ""}.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
  * The amount is the frozen share by default and may be overridden, because a member paying a
  * different amount is a real thing that happens. It is parsed to integer pesewas by
  * `toPesewas`, which throws on a float or on more than two decimals rather than rounding — the
@@ -254,6 +293,22 @@ function RoundScreen() {
   const pay = useMutation({ ...mutations.logContribution(queryClient) });
   const withdraw = useMutation({ ...mutations.voidContribution(queryClient) });
 
+  const payoutSeenRef = useRef(false);
+
+  useEffect(() => {
+    if (!data || error || isPending) return;
+    const view = toRoundView(data);
+    const me = view.roster?.find((entry) => entry.isMe);
+    const isReceiver = view.payout?.receiverMembershipId === view.myMembershipId;
+    const payoutCompleted = view.payout?.status === "completed" && isReceiver;
+
+    if (payoutCompleted && !payoutSeenRef.current) {
+      payoutSeenRef.current = true;
+      const text = turnCardText(view);
+      Share.share({ message: text }).catch(() => {});
+    }
+  }, [data, error, isPending]);
+
   // A missing group id is our own bug, not the server's, so it is never sent as a request.
   if (!Number.isInteger(groupId)) {
     return (
@@ -296,6 +351,28 @@ function RoundScreen() {
 
   const view = toRoundView(data);
 
+  const me = view.roster?.find((entry) => entry.isMe);
+  const isReceiver = view.payout?.receiverMembershipId === view.myMembershipId;
+  const receiverEntry = view.roster?.find((entry) => entry.isReceiver);
+  const isNextReceiver = me?.order != null && receiverEntry?.order != null
+    ? ((me.order - receiverEntry.order + view.roster.length) % view.roster.length) === 0
+    : false;
+
+  const nextPayoutRound =
+    me?.order != null && receiverEntry?.order != null
+      ? view.number +
+        ((me.order - receiverEntry.order + view.roster.length) % view.roster.length)
+      : view.number;
+
+  const onShare = async () => {
+    const text = turnCardText(view);
+    try {
+      await Share.share({ message: text });
+    } catch {
+      toast.info("Could not open the share sheet. Your receipt text is copied to the clipboard instead.");
+    }
+  };
+
   return (
     <ScrollView
       style={styles.screen}
@@ -327,16 +404,51 @@ function RoundScreen() {
 
       <ContributeCard view={view} pay={pay} withdraw={withdraw} />
 
+      {me?.owes && !isReceiver && (
+        <ShortRoundWarning
+          owed={me.charged}
+          nextPayoutRound={nextPayoutRound}
+          cycle={view.cycle}
+        />
+      )}
+
+      {isReceiver && me?.owes && (
+        <ShortRoundWarning
+          owed={me.charged}
+          pendingPayout={view.payout?.amount}
+          isReceiver
+        />
+      )}
+
       {view.payout && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Payout</Text>
           <Row label="Status" value={view.payout.status} />
           <Row label="Amount" value={view.payout.amount} />
           <Row label="Fee" value={view.payout.fee} tone="muted" />
+          {view.payout.completedAt && (
+            <Row
+              label="Completed"
+              value={new Date(view.payout.completedAt).toLocaleDateString()}
+            />
+          )}
           <Text style={styles.readOnlyNote}>
             A payout is sent by the payment provider, never from a phone. This is a record of one
             that already happened.
           </Text>
+
+          {isReceiver && (
+            <View style={styles.shareButton}>
+              <TurnCard view={view} />
+              <TouchableOpacity
+                style={styles.shareButtonTouch}
+                onPress={onShare}
+              >
+                <Share2 size={18} color={colors.canvas} />
+                <Text style={styles.shareButtonText}>Share my turn</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
@@ -464,7 +576,46 @@ const styles = StyleSheet.create({
   warningTitle: { color: colors.text, fontSize: 15, fontWeight: "700" },
   warningText: { color: colors.textBody, fontSize: 13, lineHeight: 19 },
 
-  readOnlyNote: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
+   readOnlyNote: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
+
+  warningCard: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.dangerSoftAlt,
+  },
+  warningRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  warningText: {
+    color: colors.textBody,
+    fontSize: 13,
+    lineHeight: 19,
+    flex: 1,
+  },
+  warningAmount: {
+    color: colors.danger,
+    fontWeight: "700",
+  },
+
+   shareButton: {
+    gap: 12,
+    marginTop: 12,
+  },
+  shareButtonTouch: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.gold,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  shareButtonText: {
+    color: colors.canvas,
+    fontSize: 14,
+    fontWeight: "700",
+  },
 
   errorTitle: { color: colors.text, fontSize: 20, fontWeight: "700", textAlign: "center" },
   errorBody: {

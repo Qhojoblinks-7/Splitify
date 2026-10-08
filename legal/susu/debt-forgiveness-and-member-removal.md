@@ -1,7 +1,8 @@
 # Debt forgiveness and member removal policy
 
 **Status:** Adopted by engineering. Legal review pending before launch.
-**Last reviewed:** 6 October 2026
+**Last reviewed:** 8 October 2026
+**Related:** Short-round resolution rules in `1791027903-money-handling-and-safeguards.md` §5.4 (SR1–SR3)
 
 ---
 
@@ -12,6 +13,11 @@ Growl is not authorised to collect money (Act 987), so this debt is a record, no
 can be settled. The policy below governs what happens to that record when the member is removed
 from the rotation.
 
+Debt originates from a short round: when a round closes short (SR1), the collected amount is paid
+to the receiver and each non-paying member receives a `DebtClaim` from the group's debt booking.
+The claim is settled only when the debtor receives a payout (SR2). If the debtor leaves before
+receiving, the debt persists (SR3) — see §2 below for how removal interacts with outstanding debt.
+
 ## 2. The two dispositions
 
 | Disposition | What the code does | When it is used |
@@ -21,6 +27,22 @@ from the rotation.
 
 There is deliberately no silent third option. A removal without a stated disposition would either
 hide a real group exposure or silently destroy it, both of which are worse than the explicit choice.
+
+### 2.1 Short-round debt is not forgiven on removal
+
+Debt created by a short round is a `DebtClaim` owed to a specific creditor (the receiver who was
+shorted), not a group-level obligation. On removal:
+
+- If the debtor **has not yet received** in the current cycle, the `DebtClaim` is preserved (not
+  written off). The creditor must be made whole from the debtor's next payout when they rejoin, or
+  the claim remains as an outstanding receivable on the membership record.
+- If the debtor **has already received** in the current cycle, an exit contribution equal to the
+  next receiver's shortfall is charged before removal, protecting the innocent member who would
+  have received.
+
+**Rule 3 (departure cost):** A member who leaves after receiving covers their share of the next
+receiver's shortfall. A member who leaves before receiving forfeits their unpaid debt — their
+creditor eats the loss.
 
 ## 3. How the code enforces this
 

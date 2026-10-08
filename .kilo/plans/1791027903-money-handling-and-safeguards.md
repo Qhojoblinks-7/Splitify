@@ -161,7 +161,7 @@ transition, and nightly in production.
 | ID | Invariant |
 |---|---|
 | Z1 | **Per group, per round, on close — the money identity:** `Σverified − ΣpayoutsGross − Σfees − Σreversals − Σrefunds − closingFloat = 0` |
-| Z2 | **`closingFloat` is the collection-account balance attributable to that group.** It is carried forward as a credit against the next round. If the group ends, it is refunded pro-rata to that round's verified contributors. It is never spent, never absorbed by us, never shown as zero |
+| Z2 | **`closingFloat` is the collection-account balance attributable to that group.** On a SHORT round (SR1), the collected amount is paid to the receiver at close, so `closingFloat = 0` for a short round. On a MET round, `closingFloat = 0` (payout equals collected − fee). Float only accumulates from overpayments or reversals, and is carried forward as a credit against the next round. If the group ends, it is refunded pro-rata to that round's verified contributors. It is never spent, never absorbed by us, never shown as zero |
 | Z2a | **The debt identity is separate and does not appear in Z1:** `0 ≤ shortfall − ΣdebtBooked`, and `debtBooked(m, round) ≤ snapshotShare(m, round)` |
 | Z3 | Per group, cumulative: `ΣallVerified − ΣallPayoutsGross − ΣallFees − ΣallReversals − ΣallRefunds − currentFloat = 0` |
 | Z4 | Per member, per round: `countedAmount ≤ 2 × snapshotShare`, and `countedAttempts = 1` |
@@ -224,10 +224,15 @@ closingFloat   = 20000
 Two things are true at once, and keeping them separate is the whole point: **GH¢200 of real
 money is still in the collection account, and Daniel owes GH¢100.** One is float, one is debt.
 
-**This is the case that the shipped code loses silently** — `releasePayout` sends exactly
-`targetAmount` and the difference vanishes into nowhere. Losing GH¢200 to a group with no
-notice, no record, and no way to ask for it is the single most likely way this product destroys
-trust in a market.
+Under the short-round resolution rules (§5.3), the GH¢200 collected is **paid out at close**
+to the receiver (Ama in this example — she was shorted), and the GH¢100 debt is recorded as a
+`DebtClaim` from Daniel to Ama. The float leaves with the receiver; it does not silently reduce
+the next round's target. The debt claim is settled when Daniel next receives a payout, and the
+deducted amount is paid to Ama (the creditor), not back into the pot.
+
+**The previous defect — `releasePayout` sending exactly `targetAmount` and the difference
+vanishing — is fixed. The collected amount is paid to the receiver at close, and the shortfall
+is carried as a debt claim against the missor, to be settled from their next payout.**
 
 ### 5.3 Worked example — debt exceeding collection
 
@@ -248,6 +253,48 @@ closingFloat   = 10000
 The group owes GH¢200 and holds GH¢100. Under the superseded revision this read as a
 `−10000` incident, which would have meant paging someone every time a group collected poorly —
 the fastest way to make a conservation check something people ignore.
+
+### 5.4 Short-round resolution rules
+
+When a round closes short (collected < target), three rules govern what happens to the float and
+the debt. The principle is: **the person who causes the absence pays for it.**
+
+| ID | Rule | Consequence |
+|---|---|---|
+| SR1 | On a SHORT round, payout the collected (net) amount to the receiver at close. The float has an owner — the receiver who was shorted — and does not silently reduce the next round's target | The receiver is made whole; no money evaporates |
+| SR2 | When a member who owes debt receives a payout, deduct the debt from that payout and route the deducted amount to the creditor (the receiver who was shorted). The deduction never reduces the payout below zero | Debt is settled with money, not promises; the innocent receiver is paid |
+| SR3 | A debt claim survives across cycles. It is settled from the debtor's next payout, not written off | The debt follows the member until paid |
+
+| Debt disposition | Rule |
+|---|---|
+| Debtor receives a payout ≥ debt | Full settlement: `membership.debt_pesewas` reduced to 0, `DebtClaim.settled_pesewas` = `amount_pesewas` |
+| Debtor receives a payout < debt | Partial settlement: deduction = payout amount, remainder carries forward to the next payout. `membership.debt_pesewas` reduced by the deduction |
+| Debtor never receives another payout | Debt persists indefinitely, visible in the member's debt balance. No silent write-off |
+| Creditor leaves the group | The `DebtClaim` survives (on_delete=PROTECT on the creditor FK). The claim is settled to the creditor's account if they rejoin, or preserved as a group-level receivable |
+| Multiple debtors short the same round | Each debtor has a separate `DebtClaim` to the receiver. Each is settled independently from that debtor's own payouts |
+
+**Worked example — 4 members, GH¢50 each, pot GH¢150. Rotation: A → B → C → D.**
+
+**Week 1 — A's turn, all pay.** Pot 150, met. A receives 150 (minus fee). Cursor → B.
+
+**Week 2 — B's turn, C misses.** B pays 0, C pays 0, A/D pay 50. Collected 100, needs 150.
+Round 2 closes SHORT. C charged 50 (DebtClaim: C owes B). **B receives the 100 collected at close.**
+Cursor → C.
+
+**Week 3 — C's turn.** C pays 0, A/B/D pay 50. Pot 150, met. C receives 150. C owes B 50 →
+**deducted and paid to B.** C keeps 100. B receives 50 (the deduction). Cursor → D.
+
+**Net positions:**
+
+| | Paid | Received | Net |
+|---|---|---|---|
+| A | 150 | 150 | 0 |
+| B | 150 | 150 | 0 |
+| C | 100 | 100 | −50 |
+| D | 150 | 150 | 0 |
+
+Everyone nets zero except C, who caused the absence and pays for it. B — innocent — is fully
+made whole across the two payouts. D — innocent — is unaffected.
 
 ---
 
@@ -312,6 +359,9 @@ a raw error, a spinner that never resolves, or a payment that silently disappear
 
 | Failure | Member sees | System does | Recovery |
 |---|---|---|---|
+| Round closes short | "The pot is GH¢100 short because C didn't pay. Your GH¢100 is paid to you now; C owes the group GH¢50." | Payout for collected amount to receiver; DebtClaim recorded (SR1) | Receiver paid at close; debt settles from debtor's next payout (SR2) |
+| Debtor receives a payout | "GH¢50 is deducted from your payout to settle what you owed B. You receive GH¢100." | Debt deducted from payout, routed to creditor (SR2) | Remaining debt carries forward |
+| Debt remains unpaid | "You still owe GH¢50 from round 2. It will be deducted from your next payout." | DebtClaim persists, visible on member summary | Settled when debtor next receives, or persists indefinitely |
 | Payout fails at provider | "We couldn't send your pot. It has not left the group account. John still has the pot." | `payout → failed`, same `payoutKey` | Automatic retry, max 5 (P-S10), then manual |
 | Payout pending > 30 min | "Your pot is on its way. We'll tell you the moment it lands." | Alert raised | Provider reconciliation (§10) |
 | Webhook lost | Nothing — the round stays `collecting`, honest | Reconciliation picks it up within 15 min | Automatic re-query |
@@ -419,6 +469,9 @@ Nothing moves a cedi until every line is ticked. **No exceptions, no "we'll do i
 - [ ] Nightly production conservation job, with alerting (RC4, Z7)
 - [ ] Rounding: rotation-order allocation implemented and tested against §2.1
 - [ ] Float visible per group, carried forward, refunded pro-rata on group end (Z2)
+- [ ] Short-round resolution: collected amount paid to receiver at close; debt claims recorded (SR1)
+- [ ] Debt settlement on payout: debtor's debt deducted and routed to creditor (SR2)
+- [ ] Debt claim survival: claims persist across rounds until settled (SR3)
 - [ ] Reversal handling implemented and tested against a simulated reversal (V-R2, V-R3)
 - [ ] Float buffer target configured per group (V-R4)
 - [ ] Every row of §9 implemented with the exact member-facing copy
@@ -433,6 +486,9 @@ Nothing moves a cedi until every line is ticked. **No exceptions, no "we'll do i
 - [ ] Manual verification renders as `Manually verified by [admin]`, never as `Verified`
 - [ ] Debt booking shows its arithmetic and is disputable
 - [ ] Removed members can settle and return — no permanent ban, no public defaults list
+- [ ] Short-round close shows the receiver the amount paid to them and the outstanding debt claim
+- [ ] Debtor-receives-payout shows the deduction and who it is paid to
+- [ ] Debt persistence shows remaining obligation across cycles
 
 ---
 

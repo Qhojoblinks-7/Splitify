@@ -134,7 +134,7 @@ export function dueSummary(groups, userId, from = Date.now()) {
 
 /** Ambiguous glyphs (I, O, 0, 1) are left out so codes survive being read aloud. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export const INVITE_CODE_LENGTH = 6;
+export const INVITE_CODE_LENGTH = 8;
 
 export function generateInviteCode() {
   let code = "";

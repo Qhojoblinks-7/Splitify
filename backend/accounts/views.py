@@ -21,13 +21,14 @@ from django.db import IntegrityError, transaction
 from django.contrib.auth.password_validation import validate_password
 
 from rest_framework import serializers, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Account
 from .phones import normalise_phone
+from .social import verify_google_id_token, verify_apple_id_token, create_or_get_account, SocialVerificationError
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -79,3 +80,122 @@ class RegisterView(APIView):
             {"access": str(tokens.access_token), "refresh": str(tokens)},
             status=status.HTTP_201_CREATED,
         )
+
+
+class SocialAuthSerializer(serializers.Serializer):
+    """Validate the social sign-in payload.
+
+    `provider` is "google" or "apple". `id_token` is the raw ID token from the
+    provider SDK. `phone` is optional — Google may supply one in the token,
+    Apple returns it only on first sign-in.
+    """
+
+    provider = serializers.ChoiceField(choices=["google", "apple"])
+    id_token = serializers.CharField(write_only=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+
+class SocialAuthView(APIView):
+    """`POST /api/auth/social/` — verify a provider ID token and issue JWTs.
+
+    The frontend performs the OAuth flow with Google or Apple and obtains an ID
+    token. This view verifies that token against the provider, creates or links
+    a local Account, and returns JWT tokens in the same shape as the registration
+    and token endpoints.
+
+    AllowAny so an anonymous visitor can reach it: it is the one API surface
+    that must be open.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def post(self, request):
+        payload = SocialAuthSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+
+        provider = payload.validated_data["provider"]
+        id_token = payload.validated_data["id_token"]
+        phone = payload.validated_data.get("phone") or None
+
+        if provider == "google":
+            try:
+                sub, email, name = verify_google_id_token(id_token)
+            except SocialVerificationError as exc:
+                return Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+        elif provider == "apple":
+            try:
+                sub, email, name = verify_apple_id_token(id_token)
+            except SocialVerificationError as exc:
+                return Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+        else:
+            return Response(
+                {"detail": "Unknown provider."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            account = create_or_get_account(
+                email=email,
+                phone=phone,
+                full_name=name,
+                verified=True,
+            )
+            tokens = RefreshToken.for_user(account)
+
+        # A social sign-in may create an account with a placeholder phone.
+        # The frontend needs to know to send the member to profile completion.
+        requires_profile = account.phone == "+233000000000"
+
+        return Response(
+            {
+                "access": str(tokens.access_token),
+                "refresh": str(tokens),
+                "requires_profile_completion": requires_profile,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        fields = ["full_name", "phone"]
+
+    def validate_phone(self, value):
+        try:
+            return normalise_phone(value)
+        except (ValueError, TypeError):
+            raise serializers.ValidationError("Enter a valid Ghanaian mobile money number.")
+
+    def update(self, instance, validated_data):
+        instance.full_name = validated_data.get("full_name", instance.full_name)
+        instance.phone = validated_data.get("phone", instance.phone)
+        instance.save()
+        return instance
+
+
+class ProfileView(APIView):
+    """`PATCH /api/members/me/profile/` — update the caller's profile.
+
+    Currently limited to `full_name` and `phone`. The phone number must be unique
+    and pass the same normalisation as registration. Used by social sign-in
+    users who registered with a placeholder phone and need to supply their real
+    number before they can receive payouts.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        serializer = ProfileSerializer(
+            request.user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Profile updated."}, status=status.HTTP_200_OK)

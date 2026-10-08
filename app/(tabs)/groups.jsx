@@ -3,7 +3,7 @@
  * Fetches the same summary payload as home and renders the group list.
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -11,13 +11,14 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { Plus, Users, TrendingUp, KeyRound, AlertTriangle, Clock, Hash, HandCoins, FileText, RefreshCw } from "lucide-react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { Plus, Users, Hash, LogIn } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import EmptyState from "../../components/molecule/EmptyState";
 import BottomSheet from "../../components/molecule/BottomSheet";
+import EmptyState from "../../components/molecule/EmptyState";
 import { useTabBarHeight } from "./_layout";
 import { SkeletonList } from "../../components/molecule/Skeleton";
 import { ApiError } from "../../services/api";
@@ -93,7 +94,18 @@ export default function GroupsScreen() {
   const [joinCode, setJoinCode] = React.useState("");
   const [joinError, setJoinError] = React.useState(null);
 
+  const { join: joinCodeFromUrl } = useLocalSearchParams();
   const groups = summary?.groups ?? [];
+
+  useEffect(() => {
+    if (joinCodeFromUrl) {
+      const cleaned = String(joinCodeFromUrl)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, INVITE_CODE_LENGTH);
+      openJoin(cleaned.length === INVITE_CODE_LENGTH ? cleaned : "");
+    }
+  }, [joinCodeFromUrl]);
 
   const onRefresh = async () => {
     await refetch();
@@ -129,10 +141,18 @@ export default function GroupsScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.title}>My Susu Groups</Text>
-        <Text style={styles.subtitle}>
-          {groups.length === 1 ? "1 active susu" : `${groups.length} active susus`}
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>My Susu Groups</Text>
+            <Text style={styles.subtitle}>
+              {groups.length === 1 ? "1 active susu" : `${groups.length} active susus`}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => openJoin()} activeOpacity={0.85}>
+            <LogIn size={18} color={colors.background} />
+            <Text style={styles.headerBtnText}>Join</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -197,18 +217,19 @@ export default function GroupsScreen() {
         <View style={styles.sheet}>
           <View style={styles.codeWrap}>
             <Hash size={20} color={colors.textMuted} />
-            <input
+            <TextInput
               style={styles.codeInput}
               placeholder="- - - - - -"
               placeholderTextColor={colors.placeholder}
               value={joinCode}
-              onChange={(text) => {
+              onChangeText={(text) => {
                 setJoinCode(text.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, INVITE_CODE_LENGTH));
                 setJoinError(null);
               }}
               autoCapitalize="characters"
               maxLength={INVITE_CODE_LENGTH}
               accessibilityLabel="Invite code"
+              autoCorrect={false}
             />
           </View>
           <Text style={styles.sheetHint}>
@@ -239,6 +260,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  headerText: { flex: 1 },
+  headerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.gold,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  headerBtnText: { color: colors.background, fontSize: 13, fontWeight: "700" },
   title: { color: colors.text, fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   subtitle: { color: colors.textMuted, fontSize: 14, marginTop: 4 },
   list: { paddingHorizontal: 20, paddingBottom: 120 },

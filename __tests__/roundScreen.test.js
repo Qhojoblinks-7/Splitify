@@ -17,6 +17,15 @@
  */
 // Native modules with nothing to talk to in node. Mocks rather than real modules because
 // `react-native` itself pulls in a native runtime this environment does not have.
+jest.mock("react", () => {
+  const actual = jest.requireActual("react");
+  return {
+    ...actual,
+    useRef: jest.fn(() => ({ current: false })),
+    useEffect: jest.fn(() => {}),
+  };
+});
+
 jest.mock("react-native", () => {
   const ReactLocal = require("react");
   const passthrough = (name) => (props) => ReactLocal.createElement(name, props, props.children);
@@ -28,6 +37,7 @@ jest.mock("react-native", () => {
     ActivityIndicator: passthrough("ActivityIndicator"),
     RefreshControl: passthrough("RefreshControl"),
     StyleSheet,
+    Share: { share: jest.fn(() => Promise.resolve({})) },
   };
 });
 
@@ -35,6 +45,7 @@ jest.mock("expo-router", () => ({ useLocalSearchParams: jest.fn(() => ({ id: "7"
 
 jest.mock("lucide-react-native", () => ({
   AlertTriangle: () => null,
+  Share2: () => null,
 }));
 
 // Capture what the screen asked the data layer for, so the assertions can inspect the request

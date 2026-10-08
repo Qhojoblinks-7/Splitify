@@ -260,3 +260,38 @@ export function rotationSummary(group) {
 }
 
 export { currentReceiver };
+
+/**
+ * A single turn card — the screenshot a member sends to her WhatsApp circle after
+ * collecting her pot. Written to be understood at 360 px without the app: the group
+ * name, that the member collected, the amount, when, and the round. The join code
+ * is deliberately never included.
+ *
+ * Built from the round view (`toRoundView`), not from `memberStatement`, because
+ * the round screen has the round data in hand and not the full group ledger.
+ */
+export function turnCardText(view) {
+  if (!view) return "";
+
+  const me = view.roster?.find((entry) => entry.isMe);
+  const receiver = view.payout?.receiverMembershipId === view.myMembershipId;
+  const collected = receiver && view.payout;
+
+  const parts = [
+    `${me?.name || "You"} collected for ${view.groupName || "your group"}`,
+  ];
+
+  if (collected) {
+    const when = view.payout.completedAt ? ` on ${formatDate(view.payout.completedAt)}` : "";
+    parts.push(`GH¢ ${view.payout.amount}${when}`);
+  } else {
+    parts.push(`Round ${view.number}${view.cycle ? `, cycle ${view.cycle}` : ""}`);
+  }
+
+  const contributed = formatGHC(
+    typeof view.verified === "string" ? parseFloat(view.verified) : (view.verified || 0),
+  );
+  parts.push(`Contributed: GH¢ ${contributed}`);
+
+  return parts.join(" — ");
+}

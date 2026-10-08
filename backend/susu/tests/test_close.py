@@ -29,9 +29,11 @@ from django.utils import timezone
 from accounts.models import Account
 from susu.models import (
     Contribution,
+    DebtClaim,
     LedgerAccount,
     LedgerEntry,
     Membership,
+    Payout,
     Round,
     SusuGroup,
 )
@@ -88,13 +90,20 @@ def pay_everyone_but(round_, skip_orders):
     for order, share in shares.items():
         if order in skip_orders:
             continue
-        pay(round_, order, share, f"CLO-{order}")
+        pay(round_, order, share, f"CLO-{round_.number}-{order}")
 
 
 def fund_completely(round_):
     shares = {entry["order"]: entry["share_pesewas"] for entry in round_.roster_snapshot}
     for order, share in shares.items():
-        pay(round_, order, share, f"CLOF-{order}")
+        pay(round_, order, share, f"CLOF-{round_.number}-{order}")
+
+
+def open_round(group):
+    """Open and expire the next round, mirroring test_full_cycle."""
+    round_ = Round.open_current(group)
+    expire(round_)
+    return round_
 
 
 # --------------------------------------------------------------------------
@@ -183,27 +192,41 @@ class TestClosingOnce:
 
 
 class TestFloatCarryForward:
-    def test_money_collected_and_not_paid_out_becomes_float(self, rnd):
+    def test_short_round_pays_collected_amount_to_receiver_at_close(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        receiver = rnd.receiver
+
+        rnd.close()
+
+        payouts = list(rnd.payouts.all())
+        assert len(payouts) == 1
+        assert payouts[0].receiver_id == receiver.pk
+        assert payouts[0].status == Payout.Status.COMPLETED
+        # Collected 15000 (orders 1 and 2 paid 7500 each), no fee
+        assert payouts[0].amount_pesewas == 15000
+        assert payouts[0].completed_at is not None
+
+    def test_short_round_leaves_no_float_because_collected_money_was_paid(self, rnd):
+        # Rule 1: the float has an owner (the receiver). The collected money
+        # is paid out at close, so nothing is left to carry.
         pay_everyone_but(rnd, skip_orders={3, 4})
 
         rnd.close()
 
-        assert rnd.current_float_pesewas() == 15000
-        assert rnd.closing_float_pesewas == 15000
+        assert rnd.current_float_pesewas() == 0
+        assert rnd.closing_float_pesewas == 0
 
-    def test_the_next_round_targets_only_what_is_still_owed(self, rnd):
-        # GH150 is already in the collection account. Demanding it again would ask the group
-        # for money twice.
+    def test_no_float_carries_to_the_next_round(self, rnd):
         pay_everyone_but(rnd, skip_orders={3, 4})
         rnd.close()
 
         following = Round.open_current(rnd.group)
 
-        assert following.carried_float_pesewas == 15000
-        assert following.target_pesewas == 15000
-        assert sum(entry["share_pesewas"] for entry in following.roster_snapshot) == 15000
+        assert following.carried_float_pesewas == 0
+        assert following.target_pesewas == rnd.group.target_pesewas
+        assert sum(entry["share_pesewas"] for entry in following.roster_snapshot) == rnd.group.target_pesewas
 
-    def test_the_next_round_reports_the_float_it_inherited(self, rnd):
+    def test_next_round_reports_no_inherited_float(self, rnd):
         pay_everyone_but(rnd, skip_orders={3, 4})
         rnd.close()
 
@@ -211,7 +234,8 @@ class TestFloatCarryForward:
 
         assert following.number == 2
         assert following.outcome == Round.Outcome.OPEN
-        assert following.target_pesewas < rnd.target_pesewas
+        assert following.carried_float_pesewas == 0
+        assert following.target_pesewas == rnd.group.target_pesewas
 
     def test_a_round_with_no_float_left_carries_nothing(self, rnd):
         fund_completely(rnd)
@@ -321,3 +345,196 @@ class TestConservationIsReal:
         rnd.book_debt()
 
         assert rnd.conservation_residual() == 0
+
+
+# --------------------------------------------------------------------------
+# Short-round resolution: payout at close + debt-claim attribution (Rule 1, D2)
+# --------------------------------------------------------------------------
+
+
+class TestShortRoundResolution:
+    def test_close_creates_a_payout_for_the_collected_amount(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+
+        rnd.close()
+
+        payout = rnd.payouts.first()
+        assert payout is not None
+        assert payout.receiver_id == rnd.receiver_id
+        # Collected 15000 (orders 1 and 2 paid 7500 each), no fee → net payout is 15000
+        assert payout.amount_pesewas == 15000
+        assert payout.status == Payout.Status.COMPLETED
+
+    def test_close_creates_debt_claims_from_each_debtor_to_the_receiver(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+
+        rnd.close()
+        rnd.refresh_from_db()
+
+        claims = list(rnd.claims.all())
+        assert len(claims) == 2  # members at order 3 and 4 did not pay
+        for claim in claims:
+            assert claim.creditor_id == rnd.receiver_id
+            assert claim.amount_pesewas > 0
+            assert claim.settled_pesewas == 0
+
+    def test_close_preserves_conservation_when_payout_and_debt_are_recorded(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+
+        rnd.close()
+        rnd.refresh_from_db()
+
+        assert rnd.ledger_residual_pesewas() == 0
+        assert rnd.conservation_residual() == 0
+
+    def test_receiver_gets_the_collected_amount_not_the_target(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        target_before = rnd.target_pesewas
+
+        rnd.close()
+        payout = rnd.payouts.first()
+
+        assert payout.amount_pesewas < target_before
+        assert payout.amount_pesewas == rnd.verified_total_pesewas()
+
+    def test_a_short_round_with_only_the_receiver_paid_creates_no_payout(self, rnd):
+        # Receiver does not pay into their own round, so collected = 0, net = 0.
+        # No payout is created — there is nothing to pay.
+        rnd.close()
+
+        assert rnd.payouts.count() == 0
+        assert rnd.closing_float_pesewas == 0
+
+
+class TestDebtSettlementOnPayout:
+    """Rule 2: a debtor's payout settles their debt to the creditor."""
+
+    def test_payout_deducts_debtor_debt_and_clears_membership_debt(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        rnd.close()
+        rnd.refresh_from_db()
+
+        debtor = membership_at(rnd, 3)
+        debtor.refresh_from_db()
+        assert debtor.debt_pesewas == 7500
+
+        claims = list(rnd.claims.filter(debtor=debtor, creditor=rnd.receiver))
+        assert len(claims) == 1
+        assert claims[0].settled_pesewas == 0
+
+        # order 3 becomes receiver in round 3 (cursor advances 0→1→2)
+        second = open_round(rnd.group)
+        fund_completely(second)
+        second.payout().mark_completed()  # finalises round 2 as PAID
+
+        third = open_round(rnd.group)
+        fund_completely(third)
+
+        payout = third.payout()
+        payout.mark_completed()
+
+        debtor.refresh_from_db()
+        assert debtor.debt_pesewas == 0
+
+        claim = DebtClaim.objects.get(pk=claims[0].pk)
+        assert claim.settled_pesewas == 7500
+        assert claim.is_settled
+
+    def test_partial_settlement_when_payout_less_than_debt(self, rnd):
+        # Round 1: orders 3 and 4 miss, each owes 7500 to receiver (order 1)
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        rnd.close()
+        rnd.refresh_from_db()
+
+        debtor = membership_at(rnd, 3)
+        debtor.refresh_from_db()
+        assert debtor.debt_pesewas == 7500
+        claim = DebtClaim.objects.get(round=rnd, debtor=debtor)
+        assert claim.amount_pesewas == 7500
+
+        # Round 2: order 2 receives (paid round, full pot) - debtor misses
+        second = open_round(rnd.group)
+        pay_everyone_but(second, skip_orders={3})  # order 3 misses again
+        second.close()
+        debtor.refresh_from_db()
+        # Debtor now owes 7500 from round 1 + 7500*allocation from round 2
+        # Total debt should be more than 7500
+
+        # Round 3: order 3 is receiver (debtor), but only 7500 collected (short round)
+        third = open_round(rnd.group)
+        pay(third, 1, 7500, f"PARTIAL-{third.number}-1")
+        third.refresh_from_db()
+        assert third.shortfall_pesewas() > 0
+        third.close()
+        third.refresh_from_db()
+
+        payout = third.payouts.first()
+        assert payout.amount_pesewas == 7500  # the collected amount
+
+        # The debtor (order 3) received a payout of 7500.
+        # Their debt should be reduced by 7500 (max deduction = payout amount)
+        debtor.refresh_from_db()
+        # Before settlement, debtor had accumulated debt from rounds 1 and 2
+        # After settlement, debt is reduced by 7500 (the payout amount)
+        # The test verifies: debt is reduced but not below 0
+        assert debtor.debt_pesewas >= 0
+        # At least some debt was settled
+        settled_claims = DebtClaim.objects.filter(
+            debtor=debtor, settled_pesewas__gt=0
+        )
+        assert settled_claims.exists()
+        # Total settled across all claims equals 7500 (the full payout)
+        total_settled = sum(c.settled_pesewas for c in settled_claims)
+        assert total_settled == 7500
+
+    def test_payout_with_no_debt_leaves_claims_intact(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        rnd.close()
+
+        second = open_round(rnd.group)
+        fund_completely(second)
+
+        payout = second.payout()
+        payout.mark_completed()
+
+        assert DebtClaim.objects.filter(settled_pesewas__gt=0).count() == 0
+
+    def test_conservation_holds_after_debt_settlement_on_payout(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        rnd.close()
+
+        second = open_round(rnd.group)
+        fund_completely(second)
+        payout = second.payout()
+        payout.mark_completed()
+
+        assert payout.round.conservation_residual() == 0
+        assert payout.round.ledger_residual_pesewas() == 0
+
+
+class TestDebtClaimSurvival:
+    """Edge cases: creditor leaves, claims survive."""
+
+    def test_a_debt_claim_survives_creditor_deactivation(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        rnd.close()
+        rnd.refresh_from_db()
+
+        receiver = rnd.receiver
+        receiver.deactivate(forgive_debt=False)
+
+        assert rnd.claims.count() == 2
+        assert all(c.creditor_id == receiver.pk for c in rnd.claims.all())
+
+    def test_claimed_debt_survives_into_the_next_cycle(self, rnd):
+        pay_everyone_but(rnd, skip_orders={3, 4})
+        rnd.close()
+
+        debtor = membership_at(rnd, 3)
+        debtor.refresh_from_db()
+        assert debtor.debt_pesewas == 7500
+
+        open_round(rnd.group)
+
+        debtor.refresh_from_db()
+        assert debtor.debt_pesewas == 7500

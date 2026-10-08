@@ -75,10 +75,13 @@ export default function RootLayout() {
         // Pick up a stored session before the first screen renders, so a returning member is
         // not shown the login screen for a beat while we find out who they are.
         await restoreSession();
-      } catch (e) {
+} catch (e) {
         // A failed restore is not a failed launch. The member signs in again, which is safe.
         console.warn(e);
       } finally {
+        // Hold the splash a beat past app readiness so the first screen mounts before the
+        // native splash tears down. Without it the transition is a hard cut.
+        await new Promise((r) => setTimeout(r, 800));
         setIsAppReady(true);
         await SplashScreen.hideAsync();
       }
@@ -127,8 +130,8 @@ export default function RootLayout() {
             {/* Auth guard: a token restored from secure-store is enough to show the app —
                 the first API call verifies it. No token means the session was cleared
                 (sign-out, 401, or cold start with nothing stored). */}
-            {!hasSeenOnboarding && <Redirect href="/onboarding" />}
-            {!token && <Redirect href="/Auth/Login" />}
+{!hasSeenOnboarding && <Redirect href="/onboarding" />}
+            {hasSeenOnboarding && !token && <Redirect href="/Auth/Login" />}
 
             {/* App lock: shown instead of the tab navigator when the idle timeout fires
                 and the member has opted in to app lock. */}
@@ -170,8 +173,10 @@ export default function RootLayout() {
                 <Stack.Screen name="PrivacyRights" />
                 <Stack.Screen name="AboutUs" />
                 <Stack.Screen name="TermsOfService" />
-                <Stack.Screen name="Security" />
-              </Stack>
+                 <Stack.Screen name="Security" />
+                 <Stack.Screen name="CompleteProfile" />
+                 <Stack.Screen name="EditProfile" />
+               </Stack>
             )}
           </View>
           </FeedbackProvider>

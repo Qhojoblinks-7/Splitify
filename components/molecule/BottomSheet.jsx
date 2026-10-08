@@ -231,7 +231,7 @@ export default function BottomSheet({
 const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 100,
+    zIndex: 300,
     elevation: 100,
   },
   backdrop: {

@@ -822,6 +822,10 @@ class Round(models.Model):
 
         Debt is booked here rather than on demand, because a closed round that keeps
         accruing obligations is not closed. Z2a, D2.
+
+        Rule 1 (short-round payout): the collected money is paid to the receiver at close,
+        for the amount collected. The float has an owner — the receiver who was shorted —
+        and does not silently reduce the next round's target.
         """
         if self.outcome != self.Outcome.OPEN:
             raise ValidationError("This round has already been closed")
@@ -847,7 +851,41 @@ class Round(models.Model):
             )
 
         self.book_debt(actor=actor, reason=reason)
+        self._record_debt_claims(actor=actor)
+
+        collected = self.verified_total_pesewas()
+        fee = self.fee_pesewas
+        net = collected - fee
+
+        if net > 0:
+            payout = Payout.objects.create(
+                round=self,
+                payout_key=self.payout_key(),
+                receiver=self.receiver,
+                amount_pesewas=net,
+                fee_pesewas=fee,
+                status=Payout.Status.QUEUED,
+                created_by=actor,
+            )
+            payout.mark_completed(actor=actor, skip_finalise=True)
+
         return self._finalise(self.Outcome.SHORT, actor=actor, reason=reason)
+
+    def _record_debt_claims(self, *, actor=None):
+        """Create a DebtClaim from each debtor to the receiver, the one who was shorted.
+
+        Called from close() after book_debt has settled the final charges, so the snapshot
+        the claims are built from is the same one the charges came from. D2.
+        """
+        for entry in self.roster_snapshot:
+            charged = entry.get("charged_pesewas", 0)
+            if charged > 0:
+                DebtClaim.objects.create(
+                    round=self,
+                    debtor_id=entry["membership_id"],
+                    creditor_id=self.receiver_id,
+                    amount_pesewas=charged,
+                )
 
     @transaction.atomic
     def _finalise(self, outcome, *, actor=None, reason=""):
@@ -1287,12 +1325,16 @@ class Payout(models.Model):
         return self
 
     @transaction.atomic
-    def mark_completed(self, *, provider_reference="", actor=None):
+    def mark_completed(self, *, provider_reference="", actor=None, skip_finalise=False):
         """The money reached the receiver. The only path money leaves the partner account. P-S1.
 
         Posts the pot and the fee separately. Folding the fee into the payout legs would make
         the partner account stop reconciling with the partner's own balance, which is the
         cheapest way to lose a cedi and the hardest to notice. P-S8.
+
+        Rule 2 (debt deduction on payout): when the payout receiver holds outstanding debt
+        claims from a short round, the debt is deducted from this payout and routed to the
+        creditors. The deduction never reduces the payout below zero. P-S5.
         """
         if self.status == self.Status.COMPLETED:
             raise ValidationError("This payout has already completed")
@@ -1336,13 +1378,109 @@ class Payout(models.Model):
                 actor=actor,
             )
 
+        self._settle_debt_claims(actor=actor)
+
         AuditEvent.record(
             actor=actor, action="payout.completed", target=self,
             from_state=previous, to_state=self.Status.COMPLETED,
         )
 
-        # P-S5: the rotation advances only on completion, never on instruction. An instructed
-        # payout that later fails must leave the round exactly as it was. Closing goes through
-        # the same path as any other close so the float is recorded identically.
-        self.round._finalise(Round.Outcome.PAID, actor=actor)
+        if not skip_finalise:
+            self.round._finalise(Round.Outcome.PAID, actor=actor)
         return self
+
+    def _settle_debt_claims(self, *, actor=None):
+        """Deduct the payout receiver's outstanding debt claims, routing funds to creditors.
+
+        The deduction never exceeds the payout amount, so a payout is never reduced below
+        zero. Remaining debt carries forward to the next payout. D2, P-S5.
+        """
+        claims = list(DebtClaim.objects.filter(
+            debtor=self.receiver,
+            settled_pesewas__lt=models.F("amount_pesewas"),
+        ))
+        if not claims:
+            return
+
+        total_debt = sum(c.remaining_pesewas for c in claims)
+        deduction = min(total_debt, self.amount_pesewas)
+        if deduction <= 0:
+            return
+
+        remaining = deduction
+        for claim in claims:
+            if remaining <= 0:
+                break
+            settled_just_now = min(claim.remaining_pesewas, remaining)
+            claim.settled_pesewas = models.F("settled_pesewas") + settled_just_now
+            claim.save(update_fields=["settled_pesewas"])
+            remaining -= settled_just_now
+
+        LedgerEntry.post(
+            self.round,
+            [
+                {"account": LedgerAccount.MEMBER_PAYABLE,
+                 "direction": LedgerEntry.Direction.DEBIT, "amount_pesewas": deduction},
+                {"account": LedgerAccount.DEBT_RECEIVABLE,
+                 "direction": LedgerEntry.Direction.CREDIT, "amount_pesewas": deduction},
+            ],
+            entry_type=PostingType.DEBT,
+            reference=f"{self.payout_key}-debt-settle",
+            actor=actor,
+        )
+
+        Membership.objects.filter(pk=self.receiver_id).update(
+            debt_pesewas=models.F("debt_pesewas") - deduction
+        )
+
+
+class DebtClaim(models.Model):
+    """One member's claim against another, born from a short round.
+
+    When a round closes short, the debt that is booked belongs to the *group*, but the money
+    that was promised belongs to the *receiver*. The receiver is the one who was shorted, so
+    they are the creditor: the debt that follows is a claim on the debtor's next payout, and
+    the deducted amount is paid to them rather than flowing back into the pot.
+
+    Rule IDs: D2 (debt attribution), P-S5 (settlement on payout).
+    """
+
+    round = models.ForeignKey(
+        Round, on_delete=models.CASCADE, related_name="claims"
+    )
+    debtor = models.ForeignKey(
+        Membership, on_delete=models.PROTECT, related_name="claims_owed"
+    )
+    creditor = models.ForeignKey(
+        Membership, on_delete=models.PROTECT, related_name="claims_against"
+    )
+    amount_pesewas = models.BigIntegerField()
+    settled_pesewas = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount_pesewas__gt=0),
+                name="debtclaim_amount_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(settled_pesewas__gte=0),
+                name="debtclaim_settled_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(settled_pesewas__lte=models.F("amount_pesewas")),
+                name="debtclaim_settled_not_exceeding_amount",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.debtor} owes {self.creditor} {self.amount_pesewas}p (settled {self.settled_pesewas}p)"
+
+    @property
+    def remaining_pesewas(self):
+        return max(0, self.amount_pesewas - self.settled_pesewas)
+
+    @property
+    def is_settled(self):
+        return self.settled_pesewas >= self.amount_pesewas

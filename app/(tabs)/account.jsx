@@ -15,6 +15,7 @@ import {
   IdCard,
   Phone,
   ShieldCheck,
+  User,
 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "../../store/session";
@@ -102,8 +103,14 @@ export default function Account() {
           </Text>
         </View>
 
-        <SectionLabel>Verification</SectionLabel>
-        <MenuItem
+         <SectionLabel>Verification</SectionLabel>
+         <MenuItem
+           icon={User}
+           label="Edit profile"
+           hint={user?.full_name || user?.name || "Tap to edit"}
+           onPress={() => router.push("/EditProfile")}
+         />
+         <MenuItem
           icon={IdCard}
           label={user?.ghanaCardVerified ? "Ghana Card verified" : "Verify your Ghana Card"}
           hint={user?.ghanaCardVerified ? "Verified" : "Required before your first payout"}

@@ -51,9 +51,9 @@ export default function Security() {
     );
   };
 
-  const onSignOutAll = () => {
-    toast.info("Signing out of all devices is not yet connected. This signs out of this device only.");
-  };
+  // const onSignOutAll = () => {
+  //   toast.info("Signing out of all devices is not yet connected. This signs out of this device only.");
+  // };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

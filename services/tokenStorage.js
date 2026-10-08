@@ -18,6 +18,7 @@ import * as SecureStore from "expo-secure-store";
 const ACCESS_KEY = "growl.session.access";
 const REFRESH_KEY = "growl.session.refresh";
 const PHONE_KEY = "growl.session.phone";
+const ONBOARDING_KEY = "growl.session.onboarding";
 
 let backend = null;
 
@@ -102,4 +103,14 @@ export async function loadPhone() {
 export async function clearPhone() {
   const store = await resolveBackend();
   await store.wipe(PHONE_KEY);
+}
+
+export async function saveHasSeenOnboarding() {
+  const store = await resolveBackend();
+  await store.write(ONBOARDING_KEY, "true");
+}
+
+export async function loadHasSeenOnboarding() {
+  const store = await resolveBackend();
+  return store.read(ONBOARDING_KEY) === "true";
 }

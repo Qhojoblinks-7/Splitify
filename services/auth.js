@@ -70,4 +70,41 @@ export async function signUp({ phone, email, password }) {
   return { access: session.access, refresh: session.refresh };
 }
 
+/**
+ * Exchange a provider ID token for our JWTs.
+ *
+ * The frontend obtains the ID token via `expo-auth-session` (Google) or
+ * `expo-apple-authentication` (Apple). This function sends it to our
+ * `/api/auth/social/` endpoint, which verifies it with the provider and
+ * returns JWT tokens in the same shape as `signIn`.
+ *
+ * Returns { access, refresh } on success.
+ */
+export async function socialSignIn({ provider, idToken, phone }) {
+  const session = await apiFetch("/api/auth/social/", {
+    method: "POST",
+    body: { provider, id_token: idToken, phone: phone || "" },
+  });
+  setAccessToken(session.access);
+  return {
+    access: session.access,
+    refresh: session.refresh,
+    requires_profile_completion: session.requires_profile_completion,
+  };
+}
+
+/**
+ * Update the caller's profile (currently: phone number and full name).
+ *
+ * Used after social sign-in to replace the placeholder phone with the real one
+ * before the member can interact with the app.
+ */
+export async function updateProfile({ full_name, phone }) {
+  const result = await apiFetch("/api/members/me/profile/", {
+    method: "PATCH",
+    body: { full_name, phone },
+  });
+  return result;
+}
+
 export { ApiError };

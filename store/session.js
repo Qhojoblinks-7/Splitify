@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 import { initialsOf } from "../services/susu";
-import { ApiError, setAccessToken, signIn as signInRequest, signUp as signUpRequest } from "../services/auth";
-import { clearTokens, loadTokens, saveTokens, savePhone } from "../services/tokenStorage";
+import { ApiError, setAccessToken, signIn as signInRequest, signUp as signUpRequest, socialSignIn as socialSignInRequest, updateProfile as updateProfileRequest } from "../services/auth";
+import { clearTokens, loadTokens, saveTokens, savePhone, loadHasSeenOnboarding, saveHasSeenOnboarding } from "../services/tokenStorage";
 import { fetchConsent, fetchNotice, giveConsent } from "../services/privacy";
 import colors from "../theme/colors";
 
@@ -61,8 +61,9 @@ export const useSessionStore = create((set, get) => ({
   refreshToken: null,
   isAuthenticated: false,
   status: "idle", // idle | restoring | signingIn | signedIn
-  storage: "unknown", // secure-store | memory | unknown
-  authError: null,
+   storage: "unknown", // secure-store | memory | unknown
+   authError: null,
+   requires_profile_completion: false,
 
   hasSeenOnboarding: false,
   notificationsEnabled: true,
@@ -87,8 +88,13 @@ export const useSessionStore = create((set, get) => ({
       return { ok: false };
     }
 
+    let hasSeenOnboarding = false;
+    try {
+      hasSeenOnboarding = await loadHasSeenOnboarding();
+    } catch {}
+
     if (!restored.access) {
-      set({ status: "idle" });
+      set({ status: "idle", hasSeenOnboarding });
       return { ok: false };
     }
 
@@ -98,6 +104,7 @@ export const useSessionStore = create((set, get) => ({
       refreshToken: restored.refresh,
       status: "idle",
       storage: "secure-store",
+      hasSeenOnboarding,
     });
     return { ok: true, needsVerification: true };
   },
@@ -201,6 +208,58 @@ export const useSessionStore = create((set, get) => ({
   },
 
   /**
+   * Sign in with Google or Apple.
+   *
+   * The frontend obtains an ID token from the provider SDK and sends it here.
+   * The backend verifies it, creates or retrieves an Account, and returns JWT
+   * tokens. The client stores them and records consent — the same
+   * post-sign-up path `authenticate` uses.
+   *
+   * If the backend created a placeholder phone (social providers don't always
+   * supply one), `result.requires_profile_completion` is true and the caller
+   * should redirect to the CompleteProfile screen.
+   */
+  socialSignIn: async ({ provider, idToken, phone }) => {
+    set({ status: "signingIn", authError: null });
+
+    try {
+      const session = await socialSignInRequest({ provider, idToken, phone });
+
+      await saveTokens(session).catch(() => {});
+
+      set({
+        token: session.access,
+        refreshToken: session.refresh,
+        user: {
+          id: null,
+          name: phone || provider,
+          phone: phone || null,
+          initials: phone ? initialsOf(phone) : (provider === "google" ? "G" : "A"),
+          avatarColor: FALLBACK_AVATAR,
+          ghanaCardVerified: false,
+        },
+        isAuthenticated: true,
+        status: "signedIn",
+        authError: null,
+        requires_profile_completion: session.requires_profile_completion,
+      });
+      await recordConsentForFirstSignIn();
+      return { ok: true, requires_profile_completion: session.requires_profile_completion };
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.status === 401
+            ? "That account could not be verified."
+            : error.offline
+              ? "We could not reach Growl. Check your connection and try again."
+              : error.message
+          : "Something went wrong signing in.";
+      set({ status: "idle", authError: message, isAuthenticated: false });
+      return { ok: false, message };
+    }
+  },
+
+  /**
    * Forget the session, everywhere.
    *
    * Called on sign-out and also by the API wrapper when the server rejects the token, so an
@@ -209,21 +268,52 @@ export const useSessionStore = create((set, get) => ({
   clearSession: () => {
     setAccessToken(null);
     clearTokens().catch(() => {});
-    set({ user: null, token: null, refreshToken: null, isAuthenticated: false, status: "idle" });
+    set({ user: null, token: null, refreshToken: null, isAuthenticated: false, status: "idle", requires_profile_completion: false });
   },
 
   signOut: () => get().clearSession(),
 
   clearAuthError: () => set({ authError: null }),
 
-  updateProfile: (patch) => {
-    const current = get().user;
-    if (!current) return;
-    const name = patch.name || current.name;
-    set({ user: { ...current, ...patch, name, initials: initialsOf(name) } });
+  updateProfile: async (patch) => {
+    set({ status: "signingIn", authError: null });
+
+    try {
+      await updateProfileRequest(patch);
+
+      const current = get().user;
+      if (current) {
+        const name = patch.full_name || patch.name || current.name;
+        set({
+          user: {
+            ...current,
+            full_name: patch.full_name || current.full_name,
+            phone: patch.phone || current.phone,
+            name,
+            initials: initialsOf(name),
+          },
+          requires_profile_completion: false,
+        });
+      }
+
+      set({ status: "signedIn" });
+      return { ok: true };
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.offline
+            ? "We could not reach Growl. Check your connection and try again."
+            : error.message
+          : "Something went wrong updating your profile.";
+      set({ status: "idle", authError: message });
+      return { ok: false, message };
+    }
   },
 
-  completeOnboarding: () => set({ hasSeenOnboarding: true }),
+  completeOnboarding: () => {
+    set({ hasSeenOnboarding: true });
+    saveHasSeenOnboarding().catch(() => {});
+  },
   setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
 }));
 

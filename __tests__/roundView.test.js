@@ -239,6 +239,7 @@ describe("a round that cannot be read says so", () => {
           feePesewas: 2500,
           status: "completed",
           receiverMembershipId: 2,
+          completedAt: "2026-10-10T10:00:00Z",
         },
       })
     );
@@ -247,6 +248,7 @@ describe("a round that cannot be read says so", () => {
       status: "completed",
       amount: "880.00",
       fee: "25.00",
+      completedAt: "2026-10-10T10:00:00Z",
       receiverMembershipId: 2,
     });
   });
