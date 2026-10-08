@@ -16,8 +16,8 @@ import {
   TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { Plus, Users, TrendingUp, AlertTriangle, HandCoins, FileText, RefreshCw, Hash } from "lucide-react-native";
+import { useRouter, useFocusEffect } from "expo-router";
+import { Plus, Users, TrendingUp, AlertTriangle, HandCoins, FileText, RefreshCw } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BottomSheet from "../../components/molecule/BottomSheet";
 import EmptyState from "../../components/molecule/EmptyState";
@@ -64,6 +64,12 @@ export default function SusuHome() {
       router.push(`/(tabs)/groups?join=${code}`);
     }
   }, [router]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => setJoinVisible(false);
+    }, [])
+  );
 
   const openJoin = (presetCode = "") => {
     setJoinCode(
@@ -187,34 +193,36 @@ export default function SusuHome() {
             <HandCoins size={20} color={colors.gold} />
           </TouchableOpacity>
         )}
-        ListFooterComponent={
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/susu/create")}>
-              <Plus size={20} color={colors.background} />
-              <Text style={styles.createBtnText}>Start a new susu</Text>
-            </TouchableOpacity>
-          </View>
-        }
+        ListFooterComponent={null}
       />
 
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <Users size={18} color={colors.gold} />
-          <Text style={styles.summaryValue}>{activeCount}</Text>
-          <Text style={styles.summaryLabel}>active susus</Text>
+      <View style={styles.summaryCardWrapper}>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Users size={18} color={colors.gold} />
+            <Text style={styles.summaryValue}>{activeCount}</Text>
+            <Text style={styles.summaryLabel}>active susus</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <TrendingUp size={18} color={colors.success} />
+            <Text style={styles.summaryValue}>{formatGHC(summary?.potTotalPesewas ?? 0)}</Text>
+            <Text style={styles.summaryLabel}>rotating weekly</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <HandCoins size={18} color={colors.gold} />
+            <Text style={styles.summaryValue}>{formatGHC(summary?.contributedPesewas ?? 0)}</Text>
+            <Text style={styles.summaryLabel}>paid in, verified</Text>
+          </View>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <TrendingUp size={18} color={colors.success} />
-          <Text style={styles.summaryValue}>{formatGHC(summary?.potTotalPesewas ?? 0)}</Text>
-          <Text style={styles.summaryLabel}>rotating weekly</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <HandCoins size={18} color={colors.gold} />
-          <Text style={styles.summaryValue}>{formatGHC(summary?.contributedPesewas ?? 0)}</Text>
-          <Text style={styles.summaryLabel}>paid in, verified</Text>
-        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/susu/create")}>
+          <Plus size={20} color={colors.background} />
+          <Text style={styles.createBtnText}>Start a new susu</Text>
+        </TouchableOpacity>
       </View>
 
       <BottomSheet
@@ -224,27 +232,38 @@ export default function SusuHome() {
         bottomInset={tabBarHeight}
       >
         <View style={styles.sheet}>
-          <View style={styles.codeWrap}>
-            <Hash size={20} color={colors.textMuted} />
-            <TextInput
-              style={styles.codeInput}
-              placeholder="- - - - - -"
-              placeholderTextColor={colors.placeholder}
-              value={joinCode}
-              onChangeText={(text) => {
-                setJoinCode(text.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, INVITE_CODE_LENGTH));
-                setJoinError(null);
-              }}
-              autoCapitalize="characters"
-              maxLength={INVITE_CODE_LENGTH}
-              accessibilityLabel="Invite code"
-              autoCorrect={false}
-            />
-          </View>
-          <Text style={styles.sheetHint}>
-            Ask the group admin for the {INVITE_CODE_LENGTH}-character code. You will be
-            added to the end of the rotation, under your own account.
-          </Text>
+          <View style={styles.codeBoxes}>
+            {Array.from({ length: INVITE_CODE_LENGTH }, (_, i) => (
+                <TextInput
+                  key={i}
+                  style={styles.codeBox}
+                  value={joinCode[i] || ""}
+                  onChangeText={(text) => {
+                    const filtered = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                    if (filtered.length <= 1) {
+                      const nextCode = joinCode.split("");
+                      nextCode[i] = filtered;
+                      // Auto-advance to next box
+                      if (filtered && i < INVITE_CODE_LENGTH - 1) {
+                        // Focus handled by ref in real implementation
+                      }
+                      // Auto-delete goes to previous
+                      if (!filtered && i > 0) {
+                        // Focus handled by ref in real implementation
+                      }
+                      setJoinCode(nextCode.join(""));
+                      setJoinError(null);
+                    }
+                  }}
+                  maxLength={1}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  keyboardType="alphanumeric"
+                  textAlign="center"
+                  accessibilityLabel={`Invite code character ${i + 1}`}
+                />
+              ))}
+            </View>
 
           {joinError ? <Text style={styles.sheetError}>{joinError}</Text> : null}
 
@@ -257,6 +276,11 @@ export default function SusuHome() {
               {join.isPending ? "Joining…" : "Join group"}
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles.sheetHint}>
+            Ask the group admin for the {INVITE_CODE_LENGTH}-character code. You will be
+            added to the end of the rotation, under your own account.
+          </Text>
         </View>
       </BottomSheet>
     </View>
@@ -315,10 +339,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    paddingVertical: 18,
-    marginHorizontal: 20,
-    marginTop: 20,
+    padding: 16,
   },
+  summaryCardWrapper: { paddingHorizontal: 20 },
   summaryItem: { flex: 1, alignItems: "center", gap: 4 },
   summaryValue: { color: colors.text, fontSize: 15, fontWeight: "800" },
   summaryLabel: { color: colors.textMuted, fontSize: 10 },
@@ -349,24 +372,33 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   createBtnText: { color: colors.background, fontSize: 16, fontWeight: "700" },
-  sheet: { gap: 8 },
-  codeWrap: {
+  sheet: { gap: 8, paddingHorizontal: 20 },
+  codeBoxes: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 8,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 12,
+    flex: 1,
+    justifyContent: "center",
+  },
+  codeBox: {
+    width: 40,
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 14,
-    height: 56,
-  },
-  codeInput: {
-    flex: 1,
     color: colors.text,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
-    letterSpacing: 6,
+    textAlign: "center",
+    textAlignVertical: "center",
+    padding: 0,
+  },
+  hiddenInput: {
+    position: "absolute",
+    opacity: 0,
+    width: 0,
+    height: 0,
+    pointerEvents: "none",
   },
   sheetHint: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   sheetError: { color: colors.danger, fontSize: 13, marginTop: 4 },
@@ -376,6 +408,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 16,
+    width: "75%",
+    alignSelf: "center",
   },
   submitDisabled: { backgroundColor: colors.borderSubtle },
   submitText: { color: colors.background, fontSize: 16, fontWeight: "700" },

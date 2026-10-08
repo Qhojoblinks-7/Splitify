@@ -173,11 +173,21 @@ export default function BottomSheet({
   const backdropOpacity = useMemo(
     () =>
       offset.interpolate({
-        inputRange: [0, Math.max(panelHeight, 1)],
+        inputRange: [0, viewport],
         outputRange: [BACKDROP_MAX_OPACITY, 0],
         extrapolate: "clamp",
       }),
-    [offset, panelHeight],
+    [offset, viewport],
+  );
+
+  const frostOpacity = useMemo(
+    () =>
+      offset.interpolate({
+        inputRange: [0, viewport],
+        outputRange: [0.35, 0],
+        extrapolate: "clamp",
+      }),
+    [offset, viewport],
   );
 
   if (!isRendered || (!isMeasuring && panelHeight <= 0)) {
@@ -187,9 +197,14 @@ export default function BottomSheet({
   return (
     <View style={styles.root} pointerEvents={isOpen ? "box-none" : "none"}>
       <Animated.View
-        style={[styles.backdrop, { opacity: backdropOpacity }]}
+        style={[
+          styles.backdrop,
+          { opacity: backdropOpacity },
+          { backgroundColor: colors.black },
+        ]}
         accessibilityViewIsModal={isOpen}
         importantForAccessibility={isOpen ? "yes" : "no-hide-descendants"}
+        pointerEvents="box-none"
       >
         <Pressable
           style={StyleSheet.absoluteFill}
@@ -198,6 +213,14 @@ export default function BottomSheet({
           accessibilityLabel="Close"
         />
       </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.frostLayer,
+          { opacity: frostOpacity },
+        ]}
+        pointerEvents="none"
+      />
 
       <Animated.View
         onLayout={isMeasuring ? handlePanelLayout : undefined}
@@ -238,12 +261,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.black,
   },
+  frostLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#ffffff",
+  },
   sheet: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceAlt,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: "hidden",

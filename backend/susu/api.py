@@ -42,7 +42,7 @@ from compliance.monitoring import evaluate_contribution
 # back in, and one ambiguous glyph is a support call at best and the wrong member in the wrong
 # rotation slot at worst.
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-_CODE_LENGTH = 8
+_CODE_LENGTH = 6
 _CODE_ATTEMPTS = 12
 
 # Rule G3: a rotation larger than this stops being a savings group and becomes a list.
@@ -383,7 +383,7 @@ class GroupJoinSerializer(serializers.Serializer):
     """
 
     inviteCode = serializers.CharField(
-        source="invite_code", max_length=_CODE_LENGTH, allow_blank=False, trim_whitespace=True
+        source="invite_code", allow_blank=False, trim_whitespace=True
     )
 
 

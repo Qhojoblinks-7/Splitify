@@ -14,8 +14,8 @@ import {
   TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Plus, Users, Hash, LogIn } from "lucide-react-native";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Plus, Users, LogIn } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BottomSheet from "../../components/molecule/BottomSheet";
 import EmptyState from "../../components/molecule/EmptyState";
@@ -106,6 +106,12 @@ export default function GroupsScreen() {
       openJoin(cleaned.length === INVITE_CODE_LENGTH ? cleaned : "");
     }
   }, [joinCodeFromUrl]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => setJoinVisible(false);
+    }, [])
+  );
 
   const onRefresh = async () => {
     await refetch();
@@ -215,27 +221,30 @@ export default function GroupsScreen() {
         bottomInset={tabBarHeight}
       >
         <View style={styles.sheet}>
-          <View style={styles.codeWrap}>
-            <Hash size={20} color={colors.textMuted} />
-            <TextInput
-              style={styles.codeInput}
-              placeholder="- - - - - -"
-              placeholderTextColor={colors.placeholder}
-              value={joinCode}
-              onChangeText={(text) => {
-                setJoinCode(text.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, INVITE_CODE_LENGTH));
-                setJoinError(null);
-              }}
-              autoCapitalize="characters"
-              maxLength={INVITE_CODE_LENGTH}
-              accessibilityLabel="Invite code"
-              autoCorrect={false}
-            />
+          <View style={styles.codeBoxes}>
+            {Array.from({ length: INVITE_CODE_LENGTH }, (_, i) => (
+              <TextInput
+                key={i}
+                style={styles.codeBox}
+                value={joinCode[i] || ""}
+                onChangeText={(text) => {
+                  const filtered = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                  if (filtered.length <= 1) {
+                    const nextCode = joinCode.split("");
+                    nextCode[i] = filtered;
+                    setJoinCode(nextCode.join(""));
+                    setJoinError(null);
+                  }
+                }}
+                maxLength={1}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                keyboardType="alphanumeric"
+                textAlign="center"
+                accessibilityLabel={`Invite code character ${i + 1}`}
+              />
+            ))}
           </View>
-          <Text style={styles.sheetHint}>
-            Ask the group admin for the {INVITE_CODE_LENGTH}-character code. You will be
-            added to the end of the rotation, under your own account.
-          </Text>
 
           {joinError ? <Text style={styles.sheetError}>{joinError}</Text> : null}
 
@@ -248,6 +257,11 @@ export default function GroupsScreen() {
               {join.isPending ? "Joining…" : "Join group"}
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles.sheetHint}>
+            Ask the group admin for the {INVITE_CODE_LENGTH}-character code. You will be
+            added to the end of the rotation, under your own account.
+          </Text>
         </View>
       </BottomSheet>
     </View>
@@ -339,24 +353,25 @@ const styles = StyleSheet.create({
   turnWrap: { alignItems: "flex-end" },
   turnLabel: { color: colors.textMuted, fontSize: 11 },
   turnName: { color: colors.text, fontSize: 14, fontWeight: "600", marginTop: 2 },
-  sheet: { gap: 8 },
-  codeWrap: {
+  sheet: { gap: 8, paddingHorizontal: 20 },
+  codeBoxes: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 8,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 12,
+    justifyContent: "center",
+  },
+  codeBox: {
+    width: 40,
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 14,
-    height: 56,
-  },
-  codeInput: {
-    flex: 1,
     color: colors.text,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
-    letterSpacing: 6,
+    textAlign: "center",
+    textAlignVertical: "center",
+    padding: 0,
   },
   sheetHint: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   sheetError: { color: colors.danger, fontSize: 13, marginTop: 4 },
@@ -366,6 +381,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 16,
+    width: "75%",
+    alignSelf: "center",
   },
   submitDisabled: { backgroundColor: colors.borderSubtle },
   submitText: { color: colors.background, fontSize: 16, fontWeight: "700" },

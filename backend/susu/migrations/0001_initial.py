@@ -99,7 +99,7 @@ class Migration(migrations.Migration):
                     "collection_partner",
                     models.CharField(blank=True, default="", max_length=60),
                 ),
-                ("invite_code", models.CharField(max_length=8, unique=True)),
+                ("invite_code", models.CharField(max_length=6, unique=True)),
                 ("admin_trust_score", models.PositiveSmallIntegerField(default=100)),
                 ("flagged_total", models.PositiveIntegerField(default=0)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),

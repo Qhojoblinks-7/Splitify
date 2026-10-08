@@ -596,7 +596,7 @@ describeLive("starting and joining a group", () => {
     expect(created.name).toBe("Live Created Susu");
     expect(created.targetPesewas).toBe(25000);
     expect(created.memberCount).toBe(1);
-    expect(created.inviteCode).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(created.inviteCode).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
 
     // The group is now the caller's, which is what makes it show up in the list the app reads.
     const mine = await runQuery(queries.groups());

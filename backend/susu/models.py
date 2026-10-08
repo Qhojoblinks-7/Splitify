@@ -212,7 +212,7 @@ class SusuGroup(models.Model):
     collection_account = models.CharField(max_length=40, blank=True, default="")
     collection_partner = models.CharField(max_length=60, blank=True, default="")
 
-    invite_code = models.CharField(max_length=8, unique=True)
+    invite_code = models.CharField(max_length=6, unique=True)
 
     admin_trust_score = models.PositiveSmallIntegerField(default=100)
     flagged_total = models.PositiveIntegerField(default=0)

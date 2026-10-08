@@ -116,7 +116,7 @@ class TestGroupCreation:
         )
 
         assert response.status_code == 201
-        assert len(response.data["inviteCode"]) == 8
+        assert len(response.data["inviteCode"]) == 6
         assert response.data["memberCount"] == 1
         assert SusuGroup.objects.get(pk=response.data["id"]).invite_code == response.data["inviteCode"]
 
